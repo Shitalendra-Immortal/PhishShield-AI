@@ -217,6 +217,31 @@ Implemented and demonstrated with tests + live Render checks:
   credential-first share needs a Roman Punjabi word in the
   sentence, so "share your OTP" and "share it with us" are never
   counted twice)
+- Merged v6 rules (from the v6 combined package, rebased on current
+  main): 16 new rules — Hindi click-link, govt-scheme, fee,
+  work-from-home, guaranteed-profit, electricity काट; Punjabi block
+  variants, click-link, digital arrest, fee, work-from-home; English
+  share-account-number, GST/tax fee, prize-claim push, enter-code on a
+  website, threat variants — plus the "never ... or share" negation fix
+  (safety warning 40 -> 10), the Punjabi KYC lowercase fix (uppercase
+  KYC never matched lowercased text), and a Roman Hindi OTP rule for
+  batao/bata/send/tell ("share" stays with the Roman Punjabi rule, so
+  "OTP share karo" is never counted twice). Our stricter Gurmukhi and
+  Roman Punjabi OTP guards are kept, not replaced by v6's weaker
+  versions. Evaluation tooling added (test-only): tests/dataset-eval.js
+  (HF + junioralive SMS) and tests/url-eval.js (PhiUSIIL URLs).
+  Measured: HF phishing-like recall 51.7% -> 100% (58/58) with ham FP
+  unchanged at 0.07%; junioralive ham FP 0/1522; PhiUSIIL URL recall
+  unchanged at 6.4% (URL rules untouched)
+- Refund bait (+25, same as prize bait): a refund/wapas/money-back
+  lure counts only when paired with a credential handover (OTP/ID/
+  account-details request) or a suspicious link — a bare refund notice
+  scores nothing, and a negated OTP notice does not arm it. Reported
+  case goes 30 -> 55 (OTP + refund, both halves now visible); refund +
+  shortener link goes 20 -> 45; refund + official link stays 0. +25
+  deliberately, not +30: it never pushes an OTP case across a band on
+  its own (a legit enter-OTP-on-the-official-website flow already
+  scores 30)
 
 Still pending (deployment/coordination steps, not code gaps):
 - AI service deployed 2026-10-31 (Render, `ai-service/` root) and backend

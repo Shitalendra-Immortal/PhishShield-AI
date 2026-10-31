@@ -249,13 +249,26 @@
       hit(15, 'Urgency pressure',
         'Scammers rush you so you act before you think.');
     }
-    if (/(account (blocked|suspended|closed|frozen)|will be blocked|suspended)/.test(lower)) {
+    // Merged from v6: will-be-deactivated / locked / stop-working variants.
+    if (/(account (blocked|suspended|closed|frozen|deactivated)|will be (blocked|suspended|closed|frozen|deactivated|locked)|will stop working|suspended)/.test(lower)) {
       hit(10, 'Threat: account blocked or suspended',
         'A threat of losing access is the most common phishing lever.');
     }
     if (/(won|winner|prize|lottery|cashback|reward|congratulations)/.test(lower)) {
       hit(25, 'Prize / reward bait',
         'Unexpected prizes are bait to get a click or a fee.');
+    }
+    // Merged from v6: prize claim push, checked independently of the
+    // prize word (prize and claim are often in different sentences).
+    if (/(won|winner|prize|lottery|jackpot)/.test(lower) &&
+        /(claim your|claim the|contact support|click here to (claim|receive)|whatsapp[^.]{0,30}details)/.test(lower)) {
+      hit(10, 'Prize claim push',
+        'A won-prize message pushing you to claim or contact support is a lure, not a win.');
+    }
+    // Merged from v6: enter a code/password on a website.
+    if (/enter[^.]{0,40}(code|otp|pin|password)[^.]{0,40}(website|link|site|page)/.test(lower)) {
+      hit(20, 'Enter code / password on a website',
+        'Real services never ask you to enter a code on a linked website to keep an account active.');
     }
     // Fake-testimonial reward lure: "Mujhe laga tha fake hai par sach
     // me Rs 2000 mil gaye, tum log bhi try karo!" + a link. A
@@ -292,6 +305,16 @@
       while ((m = re.exec(lower)) !== null) {
         var before = lower.slice(Math.max(0, m.index - 12), m.index);
         if (negBefore.test(before)) continue;
+        // Merged from v6: "Never click unknown link or share your OTP"
+        // is a warning, not a request. The 12-char guard above misses it
+        // because "never" is before "click", not before "share". Check
+        // the segment before this match, without crossing a comma:
+        // never/do-not ... or <verb> at the end means this verb is negated.
+        // "Do not share X, share Y" still fires on Y, because the comma
+        // breaks the segment before Y.
+        var segStart = Math.max(lower.lastIndexOf('.', m.index), lower.lastIndexOf('!', m.index), lower.lastIndexOf('?', m.index), lower.lastIndexOf('\n', m.index)) + 1;
+        var segBefore = lower.slice(segStart, m.index);
+        if (/(never|do not|don't|not)\b[^,]{0,80}\bor\s*$/.test(segBefore)) continue;
         fired = true;
         break;
       }
@@ -325,6 +348,12 @@
       while ((m = re.exec(lower)) !== null) {
         var before = lower.slice(Math.max(0, m.index - 12), m.index);
         if (negBefore.test(before)) continue;
+        // Merged from v6: "Never click unknown link or share your Bank
+        // details" is a warning, not a request. The 12-char guard misses
+        // it because "never" is before "click", not before "share".
+        var segStart = Math.max(lower.lastIndexOf('.', m.index), lower.lastIndexOf('!', m.index), lower.lastIndexOf('?', m.index), lower.lastIndexOf('\n', m.index)) + 1;
+        var segBefore = lower.slice(segStart, m.index);
+        if (/(never|do not|don't|not)\b[^,]{0,80}\bor\s*$/.test(segBefore)) continue;
         if (/\babout\b/.test(m[0])) continue;
         if (new RegExp(verbs + '\\s+(not|never)\\b').test(m[0])) continue;
         var after = lower.slice(m.index + m[0].length, m.index + m[0].length + 10);
@@ -336,6 +365,22 @@
         hit(30, 'Asks you to share ID documents',
           'No real bank or company asks for Aadhaar, PAN or bank details over a message. This alone is a red flag.');
       }
+    })();
+    // Merged from v6: share account number, with negation guard.
+    // Skipped if the ID-documents rule already fired (bank details /
+    // account details), to avoid double-counting the same handover.
+    // "Never ... share your Bank details" is a warning, not a request.
+    (function () {
+      if (reasons.some(function (r) { return r.label === 'Asks you to share ID documents'; })) return;
+      var fired = lower.split(/[.!?\n]+/).some(function (sent) {
+        var pair = /((share|send|provide|give)[^.]{0,40}(account number|bank details|bank account|account details)|(account number|bank details|bank account|account details)[^.]{0,40}(share|send|provide|give))/.test(sent);
+        if (!pair) return false;
+        if (/(never|do not|don't|not)\s+(click|share|send|provide|give)/.test(sent)) return false;
+        if (/never[^.]{0,60}share/.test(sent)) return false;
+        return true;
+      });
+      if (fired) hit(30, 'Asks you to share account / bank details',
+        'No real prize, job or bank asks you to share account details to receive money.');
     })();
     // KYC completion guard: "update is complete" is a receipt, not a
     // push. Without it, a routine completion notice ("Your KYC update
@@ -366,6 +411,34 @@
       hit(10, 'Hinglish account-block threat',
         'A closure threat written in Roman Hindi, the same lever as the English version.');
     }
+    // Merged from v6 (adapted): Roman Hindi OTP request. Verbs are
+    // send/tell/batao/bata only — "share" is owned by the Roman Punjabi
+    // rule below and "bhejo" by its dasso-family verbs, so no pair is
+    // ever counted twice. Skipped when the English OTP rule already
+    // fired (verb-first pairs are English's). Negation guards mirror
+    // v6: English negations before the verb plus na/mat/kabhi.
+    (function () {
+      if (reasons.some(function (r) { return r.label === 'Asks you to share an OTP, PIN or password'; })) return;
+      var verbs = '(send|tell|batao|bata)';
+      var toks = '(otp|pin|cvv|password)';
+      var re = new RegExp('(' + toks + '[^.]{0,25}?' + verbs + '|' + verbs + '[^.]{0,25}?' + toks + ')', 'g');
+      var fired = lower.split(/[.!?\n]+/).some(function (sent) {
+        var m, f = false;
+        re.lastIndex = 0;
+        while ((m = re.exec(sent)) !== null) {
+          var _before = sent.slice(0, m.index);
+          if (/(do not|never|don'?t|not)(\s+ever)?\s*$/.test(_before)) continue;
+          if (new RegExp('(na|mat|kabhi)\\s+' + verbs).test(m[0])) continue;
+          if (new RegExp(verbs + '\\s+(na|mat)(\\s|$)').test(m[0])) continue;
+          var after = sent.slice(m.index + m[0].length, m.index + m[0].length + 12);
+          if (/^\s*(na|mat)(\s|$)/.test(after)) continue;
+          f = true; break;
+        }
+        return f;
+      });
+      if (fired) hit(30, 'Roman Hindi OTP request',
+        'Asking for an OTP, PIN or password in Roman Hindi is the same red flag as in English.');
+    })();
     // Punjabi (Gurmukhi script + Roman Punjabi), mirroring the English
     // checks. Gurmukhi words are script-distinct, so they take the full
     // English point values; Roman urgency words take +10 like the
@@ -374,7 +447,7 @@
       hit(15, 'Punjabi urgency words',
         'Punjabi pressure words (turant, hune, jaldi, chheti) rush you the same way English urgency does.');
     }
-    if (/(ਖਾਤਾ ਬੰਦ|ਬੰਦ ਹੋ ਜਾਵੇਗਾ|ਬਲਾਕ ਹੋ ਜਾਵੇਗਾ|ਅਕਾਊਂਟ ਬੰਦ)/.test(lower)) {
+    if (/(ਖਾਤਾ ਬੰਦ|ਬੰਦ ਹੋ ਜਾਵੇਗਾ|ਬਲਾਕ ਹੋ ਜਾਵੇਗਾ|ਅਕਾਊਂਟ ਬੰਦ|ਬੰਦ ਹੋ ਸਕਦਾ ਹੈ|ਬਲਾਕ ਹੋ ਸਕਦਾ ਹੈ|ਬੰਦ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ|ਬਲਾਕ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ|ਬੰਦ ਹੋ ਸਕਦਾ|ਬਲਾਕ ਹੋ ਸਕਦਾ)/.test(lower)) {
       hit(10, 'Punjabi account-block threat',
         'A closure threat written in Punjabi, the same lever as the English version.');
     }
@@ -419,10 +492,15 @@
       hit(30, 'Punjabi OTP request',
         'Asking for an OTP, PIN or password in Punjabi is the same red flag as in English.');
     }
-    if (/(ਕੇਵਾਈਸੀ|KYC)[^.।]{0,25}(ਅਪਡੇਟ|ਪੂਰਾ|ਪੂਰੀ|ਵੈਰੀਫਾਈ|ਬਕਾਇਆ|ਅਧੂਰਾ|ਅਧੂਰੀ|ਖਤਮ)/.test(lower) &&
+    if (/(ਕੇਵਾਈਸੀ|kyc)[^.।]{0,25}(ਅਪਡੇਟ|ਪੂਰਾ|ਪੂਰੀ|ਵੈਰੀਫਾਈ|ਬਕਾਇਆ|ਅਧੂਰਾ|ਅਧੂਰੀ|ਖਤਮ)/.test(lower) &&
         !/(ਪੂਰਾ|ਪੂਰੀ)\s+(ਹੋ ਗਈ|ਹੋ ਗਿਆ)/.test(lower)) {
       hit(20, 'Punjabi KYC trick',
         'A KYC update push written in Punjabi, the top UPI-era scam pattern.');
+    }
+    // Merged from v6: click-link push in Punjabi.
+    if (/(ਲਿੰਕ 'ਤੇ ਕਲਿੱਕ|ਲਿੰਕ ਤੇ ਕਲਿੱਕ|ਇਸ ਲਿੰਕ 'ਤੇ ਕਲਿੱਕ)/.test(lower)) {
+      hit(10, 'Click-link instruction (Punjabi)',
+        'Telling you to click a link in a bank/KYC message is the phishing push itself.');
     }
     if (/(ਬੈਂਕ|sbi|hdfc|icici|paytm|phonepe|upi)[^.।]{0,40}(ਬੰਦ|ਵੈਰੀਫਾਈ|ਅਪਡੇਟ|ਲਿੰਕ|ਖਤਮ|ਬਲਾਕ)/.test(lower)) {
       hit(10, 'Punjabi financial brand + action',
@@ -431,6 +509,32 @@
     if (/(ਬਿਜਲੀ)[^.।]{0,40}(ਕੱਟ|ਬਕਾਇਆ)/.test(lower)) {
       hit(20, 'Punjabi electricity scam pattern',
         'A fake power-cut warning written in Punjabi.');
+    }
+    // Merged from v6 (guarded): Punjabi digital arrest. The +30 is
+    // skipped when the English rule already fired on the same
+    // ਡਿਜੀਟਲ ਅਰੈਸਟ claim — v6 fires both for the same arrest (+30 +30).
+    // The +20 payment is guarded independently: it fires when the
+    // payment words are Punjabi and the English payment rule did not
+    // fire, so a Punjabi arrest + payment still reaches 30 + 20.
+    if (/(ਡਿਜੀਟਲ ਅਰੈਸਟ)/.test(lower) &&
+        !reasons.some(function (r) { return r.label === 'Digital arrest scam'; })) {
+      hit(30, 'Punjabi digital arrest scam',
+        'No police, CBI or ED officer arrests you over a video call or demands money to avoid arrest.');
+    }
+    if (/(ਡਿਜੀਟਲ ਅਰੈਸਟ)/.test(lower) &&
+        /(ਭੁਗਤਾਨ|ਜਮ੍ਹਾ|ਟ੍ਰਾਂਸਫਰ|ਪੈਸੇ)/.test(lower) &&
+        !reasons.some(function (r) { return r.label === 'Payment demanded under arrest threat'; })) {
+      hit(20, 'Payment demanded under arrest threat (Punjabi)',
+        'Demanding payment to avoid arrest is the digital-arrest lever.');
+    }
+    // Merged from v6: Punjabi upfront fee and work-from-home bait.
+    if (/(ਰਜਿਸਟ੍ਰੇਸ਼ਨ|ਪ੍ਰੋਸੈਸਿੰਗ|ਡਿਲੀਵਰੀ|ਐਡਵਾਂਸ)[^.।]{0,20}(ਫੀਸ|ਫੀ)|(ਫੀਸ|ਫੀ)[^.।]{0,20}(ਜਮ੍ਹਾ|ਦਿਓ|ਭੁਗਤਾਨ)/.test(lower)) {
+      hit(20, 'Upfront fee request (Punjabi)',
+        'Real jobs, loans and deliveries do not demand a fee up front to release money or a parcel.');
+    }
+    if (/(ਘਰ ਬੈਠੇ)[^.।]{0,40}(ਕਮਾਓ|ਕਮਾਈ|ਰੋਜ਼|ਰੋਜ਼ਾਨਾ)/.test(lower)) {
+      hit(20, 'Work-from-home earning bait (Punjabi)',
+        'Daily earning from home with no experience, plus a fee, is the classic job scam.');
     }
     // Roman Punjabi (SMS-style, as with Hinglish). "KYC update karo" is
     // already caught by the English KYC check, so no Roman KYC rule here
@@ -508,7 +612,8 @@
       hit(15, 'Hindi urgency words',
         'Hindi pressure words (turant, abhi, jaldi) rush you the same way English urgency does.');
     }
-    if (/(खाता बंद|बंद हो जाएगा|बंद हो जायेगा|ब्लॉक हो जाएगा|अकाउंट बंद|खाता ब्लॉक)/.test(lower)) {
+    // Merged from v6: ब्लॉक/बंद कर दिया जाएगा, हो सकता है variants.
+    if (/(खाता बंद|बंद हो जाएगा|बंद हो जायेगा|ब्लॉक हो जाएगा|अकाउंट बंद|खाता ब्लॉक|ब्लॉक कर दिया जाएगा|बंद कर दिया जाएगा|ब्लॉक हो सकता है|बंद हो सकता है|ब्लॉक कर दिया|बंद कर दिया)/.test(lower)) {
       hit(10, 'Hindi account-block threat',
         'A closure threat written in Hindi, the same lever as the English version.');
     }
@@ -563,13 +668,36 @@
       hit(20, 'Hindi KYC trick',
         'A KYC update push written in Hindi, the top UPI-era scam pattern.');
     }
+    // Merged from v6: click-link push in Hindi.
+    if (/(लिंक पर क्लिक|लिंक पे क्लिक|नीचे दिए गए लिंक)/.test(lower)) {
+      hit(10, 'Click-link instruction (Hindi)',
+        'Telling you to click a link in a bank/KYC message is the phishing push itself.');
+    }
     if (/(बैंक|sbi|hdfc|icici|paytm|phonepe|upi)[^.।!?]{0,40}(बंद|वेरिफाई|अपडेट|लिंक|खत्म|ब्लॉक|निलंबित)/.test(lower)) {
       hit(10, 'Hindi financial brand + action',
         'A trusted money brand plus a Hindi action you are pushed to take.');
     }
-    if (/(बिजली)[^.।!?]{0,40}(कट|बकाया|डिस्कनेक्ट)/.test(lower)) {
+    if (/(बिजली)[^.।!?]{0,40}(क[ा]?ट|बकाया|डिस्कनेक्ट)/.test(lower)) {
       hit(20, 'Hindi electricity scam pattern',
         'A fake power-cut warning written in Hindi.');
+    }
+    // Merged from v6: Hindi fee / guaranteed-profit / govt-scheme /
+    // work-from-home bait.
+    if (/(रजिस्ट्रेशन|प्रोसेसिंग|डिलीवरी|एडवांस|पंजीकरण)[^.।!?]{0,20}(फीस|शुल्क)|(फीस|शुल्क)[^.।!?]{0,20}(जमा|दें|भुगतान|देनी)/.test(lower)) {
+      hit(20, 'Upfront fee request (Hindi)',
+        'Real jobs, loans and deliveries do not demand a fee up front to release money or a parcel.');
+    }
+    if (/(गारंटीड|गारंटी)[^.।!?]{0,20}(मुनाफा|लाभ)|(दोगुना|डबल)[^.।!?]{0,20}(पैसा|मुनाफा)|(100%|सौ प्रतिशत)[^.।!?]{0,20}(मुनाफा|लाभ)/.test(lower)) {
+      hit(30, 'Guaranteed-profit investment bait (Hindi)',
+        'No real investment guarantees profit or doubles money in days.');
+    }
+    if (/(सरकारी योजना)[^.।!?]{0,40}(मिलेंगे|पाएं|लाभ|आवेदन|राशि)/.test(lower)) {
+      hit(15, 'Government scheme lure (Hindi)',
+        'A government-scheme promise plus an apply/claim push is a common Indian scam pattern.');
+    }
+    if (/(घर बैठे)[^.।!?]{0,40}(कमाएं|कमाओ|कमा|रोज़|रोज)/.test(lower)) {
+      hit(20, 'Work-from-home earning bait (Hindi)',
+        'Daily earning from home with no experience, plus a fee, is the classic job scam.');
     }
     // Scam types that previously scored 0-35: digital arrest, fake
     // police threats, upfront fees, guaranteed-profit investment bait,
@@ -588,6 +716,12 @@
     if (/(registration fee|processing fee|delivery fee|advance fee|customs fee|clearance fee)/.test(lower)) {
       hit(20, 'Upfront fee request',
         'Real jobs, loans and deliveries do not demand a fee up front to release money or a parcel.');
+    }
+    // Merged from v6: GST/tax/handling/service fee to release/claim.
+    // Only fee types NOT already in the Upfront list, to avoid double count.
+    if (/(gst fee|tax fee|handling fee|service fee)[^.]{0,40}(release|claim)/.test(lower)) {
+      hit(20, 'Fee to release / claim winnings',
+        'Real prizes never charge a fee to release them; a fee-to-claim is the scam itself.');
     }
     if (/(guaranteed profit|double your (money|bitcoin|btc|crypto)|double.*money.*days|100% profit)/.test(lower)) {
       // 30, not 25: a guaranteed-profit claim on its own reaches the
@@ -650,6 +784,30 @@
         reasons.push({ label: 'Link risk capped at 40 points in message mode',
           detail: 'The link itself scored ' + urlScore + '; message mode counts at most 40 of it.', points: 0 });
       }
+    }
+
+    // Refund bait: an unexpected money-back lure ("refund pending",
+    // "paise wapas") counts only when paired with a credential handover
+    // or a suspicious link — a bare refund notice ("your refund has
+    // been processed", "refund pending" with no action) is a routine
+    // status and scores nothing on its own. Same +25 as the prize bait:
+    // it lifts a refund + OTP message from 30 to 55 and a refund +
+    // suspicious-link message from safe to suspicious, but it never
+    // pushes an OTP case across a band on its own (a legit
+    // enter-OTP-on-the-official-website flow already scores 30).
+    var refundLure = /(refund|money[- ]back|\bwapas\b|रिफंड|ਰਿਫੰਡ)/.test(lower);
+    var handoverFired = reasons.some(function (r) {
+      return r.label === 'Asks you to share an OTP, PIN or password' ||
+        r.label === 'Hindi OTP / bank-info request' ||
+        r.label === 'Punjabi OTP request' ||
+        r.label === 'Roman Punjabi OTP request' ||
+        r.label === 'Roman Hindi OTP request' ||
+        r.label === 'Asks you to share ID documents' ||
+        r.label === 'Asks you to share account / bank details';
+    });
+    if (refundLure && (handoverFired || urlScore > 0)) {
+      hit(25, 'Refund bait',
+        'An unexpected refund plus a credential handover or a suspicious link is the refund-scam shape; real refunds never need your OTP.');
     }
 
     // NOTE: a "do not share" warning earns NO deduction. Scammers copy
