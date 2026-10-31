@@ -31,8 +31,51 @@ const GEMINI_API_BASE_URL = (process.env.GEMINI_API_BASE_URL || 'https://generat
 const PROVIDER_TIMEOUT_MS = 7000;
 const MAX_INPUT_CHARS = 5000;
 
+// Optional shared secret for /ai/analyze. When set, callers must send it
+// as X-AI-Service-Key; without it the endpoint answers 401. When unset the
+// endpoint is open (local dev only — always set it on a public deploy).
+// The backend sends it from its own AI_SERVICE_KEY env var.
+const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || '';
+// Backstop against excessive provider usage (each call costs Gemini quota).
+const AI_RATE_LIMIT_MAX = Number(process.env.AI_RATE_LIMIT_MAX) || 100;
+const AI_RATE_LIMIT_WINDOW_MS = Number(process.env.AI_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+
 const app = express();
+
+// Behind Render's proxy, so client IPs (for rate limiting) come from
+// X-Forwarded-For.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '200kb' }));
+
+// Tiny in-memory rate limiter for /ai/analyze (same pattern as backend).
+const aiHits = new Map();
+function aiRateLimiter(req, res, next) {
+  const now = Date.now();
+  const key = req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
+  aiHits.forEach((entry, k) => { if (entry.reset <= now) aiHits.delete(k); });
+  let entry = aiHits.get(key);
+  if (!entry || entry.reset <= now) {
+    entry = { count: 0, reset: now + AI_RATE_LIMIT_WINDOW_MS };
+    aiHits.set(key, entry);
+  }
+  entry.count += 1;
+  if (entry.count > AI_RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.reset - now) / 1000);
+    res.setHeader('Retry-After', String(retryAfter));
+    return res.status(429).json({
+      error: { code: 'RATE_LIMITED', message: 'Too many requests, try again later.' },
+    });
+  }
+  return next();
+}
+
+function requireServiceKey(req, res, next) {
+  if (!AI_SERVICE_KEY) return next();
+  if (req.headers['x-ai-service-key'] === AI_SERVICE_KEY) return next();
+  return res.status(401).json({
+    error: { code: 'UNAUTHORIZED', message: 'Missing or invalid service key.' },
+  });
+}
 
 function isConfigured() {
   return GEMINI_API_KEY.length > 0;
@@ -52,7 +95,7 @@ app.get('/ai/health', (req, res) => {
 });
 
 // --------------------------------------------------------------- analyze
-app.post('/ai/analyze', async (req, res) => {
+app.post('/ai/analyze', requireServiceKey, aiRateLimiter, async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const { input } = body;
@@ -131,7 +174,7 @@ async function callGeminiOnce(input, engine, isRetry) {
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: 'user', parts: [{ text: userText }] }],
         generationConfig: {
           temperature: 0.2,

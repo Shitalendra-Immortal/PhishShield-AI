@@ -10,6 +10,7 @@ const PhishShield = require('./analyzer.js');
 const { createRateLimiter } = require('./rateLimit.js');
 const { followRedirects } = require('./redirect.js');
 const { lookupUrlhaus } = require('./urlhaus.js');
+const { getAiOpinion } = require('./ai.js');
 
 const PORT = process.env.PORT || 3000;
 const MAX_INPUT = 5000;
@@ -37,6 +38,28 @@ const SAMPLES = [
 
 const app = express();
 
+// Structured request logs, registered first so every request is logged
+// even when body parsing fails. Deliberately minimal: method, path,
+// status, duration, and (for analyze) the score band only. NEVER the input
+// text, URLs, hosts, headers, or IPs — submitted links can carry private
+// tokens, and log lines must stay safe to paste into a chat or ticket.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const entry = {
+      ts: new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      durationMs: Date.now() - start
+    };
+    if (res.locals.log) Object.assign(entry, res.locals.log);
+    if (res.locals.errorCode) entry.error = res.locals.errorCode;
+    console.log(JSON.stringify(entry));
+  });
+  next();
+});
+
 // Behind Render's proxy, so client IPs (for rate limiting) come from
 // X-Forwarded-For. Demo scope: a spoofed header only changes which bucket
 // a client counts against.
@@ -61,6 +84,7 @@ app.use('/api/analyze', createRateLimiter({
 }));
 
 function sendError(res, status, code, message) {
+  res.locals.errorCode = code;
   return res.status(status).json({ error: { code, message } });
 }
 
@@ -123,6 +147,15 @@ app.post('/api/analyze', async (req, res) => {
     }
   }
 
+  // Snapshot of the ENGINE result (pre-enrichment): the AI second opinion
+  // is decided on the engine score, per AI_SERVICE_CONTRACT.md.
+  const engineSnapshot = {
+    kind: result.kind,
+    score: result.score,
+    verdict: result.verdict,
+    reasons: result.reasons.slice()
+  };
+
   // URL-mode enrichment (additive only; never breaks the base verdict).
   // Message mode gets no enrichment: short links inside messages are
   // already capped at 40 points by the engine.
@@ -159,7 +192,7 @@ app.post('/api/analyze', async (req, res) => {
             result.verdict = PhishShield.verdictFor(result.score);
           }
         }
-        // URLhaus: keyless, best-effort. Listed => +60 (forces Phishing band).
+        // URLhaus: Auth-Key header from env, best-effort. Listed => +60 (forces Phishing band).
         // Any failure leaves the base verdict untouched.
         if (process.env.URLHAUS_ENABLED !== '0') {
           const intel = await lookupUrlhaus(result.finalUrl || targetUrl, {});
@@ -180,6 +213,23 @@ app.post('/api/analyze', async (req, res) => {
       }
     }
   }
+  // AI second opinion (additive only): borderline ENGINE scores (30-59),
+  // and only when AI_SERVICE_URL is set. Never changes score/verdict; on
+  // any failure the field is simply omitted.
+  if (process.env.AI_SERVICE_URL && engineSnapshot.score >= 30 && engineSnapshot.score <= 59) {
+    try {
+      const opinion = await getAiOpinion(input, engineSnapshot);
+      if (opinion) result.ai = opinion;
+    } catch (e) {
+      // AI is never on the critical path.
+    }
+  }
+  res.locals.log = {
+    level: result.verdict.level,
+    score: result.score,
+    threatIntel: result.threatIntel ? result.threatIntel.status : undefined,
+    ai: !!result.ai
+  };
   return res.json(result);
 });
 

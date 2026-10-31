@@ -23,6 +23,13 @@ const SIGNAL_TYPES = [
 const ASSESSMENTS = ['safe', 'suspicious', 'phishing'];
 const CONFIDENCES = ['low', 'medium', 'high'];
 
+// Output limits (v1): bound what the model may return so one wild answer
+// cannot flood the UI or fake confidence.
+const MAX_SIGNALS = 5;
+const MAX_DETAIL_CHARS = 500;
+const MAX_EXPLANATION_CHARS = 1000;
+const MAX_ACTION_CHARS = 300;
+
 const SIGNAL_MEANINGS = {
   false_authority: 'Claims to be a bank, brand, or official body without proof.',
   manufactured_urgency: 'Rushes the reader ("now", "immediately", "last chance").',
@@ -76,6 +83,55 @@ const SYSTEM_PROMPT = [
   '  when you disagree with the rule engine on thin evidence.',
   '- If the evidence is insufficient, say so in the explanation and use',
   '  "low" confidence. Do not guess a stronger verdict than the evidence allows.',
+  '',
+  'Hinglish (Hindi written in Roman script) is common in Indian scam and',
+  'legitimate messages. Assess the MEANING, not just English keywords:',
+  '- Treat Hinglish urgency and threats as equivalent to their English',
+  '  forms: "band ho jayega" (will be blocked), "abhi" / "turant" (now /',
+  '  immediately), "KYC update karo" (update KYC), "account block ho jayega".',
+  '- Example: "Aapka bank account band ho jayega, abhi KYC update karo."',
+  '  means "Your bank account will be blocked, update KYC now" — assess it',
+  '  exactly as you would the English version, including any link or sender',
+  '  evidence.',
+  '- Output stays in English (assessment, signals, explanation,',
+  '  recommendedAction), even when the input is Hinglish.',
+  '',
+  'Contextual impersonation — mention is not impersonation:',
+  '- Impersonation means the message PRESENTS ITSELF as the brand: it speaks',
+  '  in the brand\'s voice ("Dear customer, SBI..."), claims to be sent by the',
+  '  brand, or carries the brand\'s sender name or signature — usually',
+  '  combined with an action the reader must take.',
+  '- Merely MENTIONING a brand is not impersonation: a friend warning about',
+  '  an SBI scam, a news item about SBI, or a user saying "my SBI card',
+  '  arrived" does not impersonate SBI.',
+  '- Only use the impersonation signal when the message claims to BE the',
+  '  brand. A brand mention plus a suspicious link or credential request',
+  '  can still be phishing on those signals, but do not add impersonation',
+  '  on the mention alone.',
+  '',
+  'Legitimate messages — do not flag routine notifications:',
+  '- A genuine OTP delivery ("Your OTP is 482913. Do not share it with',
+  '  anyone.") has no link, no action beyond entering the code in the',
+  '  official app, and no threat. Assess it as safe.',
+  '- A plain deadline or reminder (a bill due date, an offer expiry) with no',
+  '  suspicious link, no credential request, and no impersonation is not',
+  '  phishing on the deadline alone.',
+  '- A bank notification with no link and no credential request is not',
+  '  phishing merely because it comes from a bank context.',
+  '- The phishing pattern is the COMBINATION: pressure or a deadline PLUS a',
+  '  suspicious link, a credential request, or impersonation. Tone alone is',
+  '  not enough.',
+  '',
+  'Contradictory or thin evidence — explain the uncertainty:',
+  '- If wording looks suspicious (urgency, threats, a deadline) but there is',
+  '  no fraud evidence — no link, no credential request, no impersonation —',
+  '  do not upgrade to phishing on tone alone. Assess at most suspicious,',
+  '  with low or medium confidence.',
+  '- Say plainly in the explanation what is missing, for example: "No link',
+  '  or credential request was found, so this cannot be confirmed as',
+  '  phishing."',
+  '- If evidence points both ways, weigh what is actually present over what',
+  '  is merely implied, and let the explanation show the tension.',
   '',
   'URL honesty:',
   '- You cannot fetch or verify where a link goes. Do NOT claim a URL is',
@@ -145,6 +201,12 @@ function parseAiOutput(text) {
  *  - "high" confidence with fewer than two signals is downgraded to "medium".
  *  - "phishing" supported only by a single suspicious_link signal is
  *    downgraded to "suspicious" (URL honesty rule).
+ * Output limits are enforced as rejections (the caller retries once, then
+ * the service answers available: false):
+ *  - duplicate signal types are rejected (repeats must not fake the
+ *    two-signal high-confidence rule),
+ *  - at most 5 signals, each detail at most 500 chars,
+ *  - explanation at most 1000 chars, recommendedAction at most 300 chars.
  */
 function validateAiOutput(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
@@ -159,6 +221,10 @@ function validateAiOutput(obj) {
   if (!Array.isArray(obj.signals)) {
     return { ok: false, reason: 'signals is not an array.' };
   }
+  if (obj.signals.length > MAX_SIGNALS) {
+    return { ok: false, reason: `Too many signals (max ${MAX_SIGNALS}).` };
+  }
+  const seenTypes = new Set();
   for (const signal of obj.signals) {
     if (!signal || typeof signal !== 'object' || Array.isArray(signal)) {
       return { ok: false, reason: 'A signal is not an object.' };
@@ -166,15 +232,28 @@ function validateAiOutput(obj) {
     if (!SIGNAL_TYPES.includes(signal.type)) {
       return { ok: false, reason: `Unknown signal type: ${String(signal.type)}` };
     }
+    if (seenTypes.has(signal.type)) {
+      return { ok: false, reason: `Duplicate signal type: ${signal.type}` };
+    }
+    seenTypes.add(signal.type);
     if (typeof signal.detail !== 'string' || !signal.detail.trim()) {
       return { ok: false, reason: 'A signal detail is missing or empty.' };
+    }
+    if (signal.detail.trim().length > MAX_DETAIL_CHARS) {
+      return { ok: false, reason: 'A signal detail is too long.' };
     }
   }
   if (typeof obj.explanation !== 'string' || !obj.explanation.trim()) {
     return { ok: false, reason: 'explanation is missing or empty.' };
   }
+  if (obj.explanation.trim().length > MAX_EXPLANATION_CHARS) {
+    return { ok: false, reason: 'explanation is too long.' };
+  }
   if (typeof obj.recommendedAction !== 'string' || !obj.recommendedAction.trim()) {
     return { ok: false, reason: 'recommendedAction is missing or empty.' };
+  }
+  if (obj.recommendedAction.trim().length > MAX_ACTION_CHARS) {
+    return { ok: false, reason: 'recommendedAction is too long.' };
   }
 
   const data = {
