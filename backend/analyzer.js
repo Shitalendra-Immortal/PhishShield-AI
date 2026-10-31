@@ -382,7 +382,40 @@
       hit(25, 'Punjabi prize bait',
         'An unexpected prize in Punjabi is the same bait as in English.');
     }
-    if (/((ਓਟੀਪੀ|ਪਿੰਨ|ਪਾਸਵਰਡ)[^.।]{0,25}(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)|(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)[^.।]{0,25}(ਓਟੀਪੀ|ਪਿੰਨ|ਪਾਸਵਰਡ))/.test(lower)) {
+    // Punjabi (Gurmukhi) OTP request, checked per match like the Hindi
+    // rule: Latin credentials pair with Gurmukhi verbs ("OTP ਸਾਂਝਾ
+    // ਕਰੋ" — the mixed-script shape real messages use), but a pair
+    // with no Gurmukhi character is plain English, already covered by
+    // the English rule, so it is excluded here and never
+    // double-counted. A negated pair ("ਓਟੀਪੀ ਨਾ ਦੱਸੋ",
+    // "OTP ਸਾਂਝਾ ਨਾ ਕਰੋ") is a warning and is skipped, but a real
+    // pair in the same sentence still fires. Windows are lazy on
+    // purpose, so a greedy window cannot swallow a second pair.
+    var punjabiCredVerbs = '(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)';
+    var punjabiCredPairG = /((ਓਟੀਪੀ|otp|ਪਿੰਨ|pin|ਪਾਸਵਰਡ|password|ਸੀਵੀਵੀ|cvv)[^.।!?]{0,30}?(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)|(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)[^.।!?]{0,30}?(ਓਟੀਪੀ|otp|ਪਿੰਨ|pin|ਪਾਸਵਰਡ|password|ਸੀਵੀਵੀ|cvv))/g;
+    var punjabiOtpHit = lower.split(/[।.!?\n]+/).some(function (s) {
+      var m, fired = false;
+      punjabiCredPairG.lastIndex = 0;
+      while ((m = punjabiCredPairG.exec(s)) !== null) {
+        if (!/[\u0A00-\u0A7F]/.test(m[0])) continue;
+        // Negation before the verb inside the match ("ਓਟੀਪੀ ਨਾ ਦੱਸੋ").
+        if (new RegExp('(ਨਾ|ਮਤ)\\s+' + punjabiCredVerbs).test(m[0])) continue;
+        // Negation after the verb inside the match ("ਸਾਂਝਾ ਨਾ ਕਰੋ" in one span).
+        if (new RegExp(punjabiCredVerbs + '\\s+(ਨਹੀਂ|ਨਾ|ਮਤ)(\\s|$)').test(m[0])) continue;
+        // Negation immediately before a verb-first match ("ਨਾ ਦੱਸੋ ਆਪਣਾ ਓਟੀਪੀ").
+        if (new RegExp('^' + punjabiCredVerbs).test(m[0])) {
+          var before = s.slice(Math.max(0, m.index - 4), m.index);
+          if (/(ਨਾ|ਮਤ)\s*$/.test(before)) continue;
+        }
+        // Negation immediately after the match ("OTP ਸਾਂਝਾ" + " ਨਾ ਕਰੋ").
+        var after = s.slice(m.index + m[0].length, m.index + m[0].length + 12);
+        if (/^\s*(ਨਹੀਂ|ਨਾ|ਮਤ)(\s|$)/.test(after)) continue;
+        fired = true;
+        break;
+      }
+      return fired;
+    });
+    if (punjabiOtpHit) {
       hit(30, 'Punjabi OTP request',
         'Asking for an OTP, PIN or password in Punjabi is the same red flag as in English.');
     }
@@ -406,10 +439,54 @@
       hit(10, 'Roman Punjabi urgency words',
         'Roman Punjabi pressure words (hun, chheti) rush you the same way English urgency does.');
     }
-    if (/((otp|pin|cvv|password)[^.]{0,25}(dasso|bhejo|deyo|paao)|(dasso|bhejo|deyo|paao)[^.]{0,25}(otp|pin|cvv|password))/.test(lower)) {
-      hit(30, 'Roman Punjabi OTP request',
-        'Asking for an OTP, PIN or password in Roman Punjabi is the same red flag as in English.');
-    }
+    // Roman Punjabi OTP request, checked per match: "share" joins the
+    // verbs ("OTP share karo" is the commonest Roman phrasing and was
+    // missed entirely — the English rule is verb-first only). A
+    // negated pair ("OTP share na karo", "do not share your OTP")
+    // is a warning and is skipped, but a real pair in the same
+    // sentence still fires. The English negations are in the guard
+    // on purpose: adding "share" without them would newly flag
+    // "do not share your OTP" through this rule.
+    (function () {
+      var romanPairG = /((otp|pin|cvv|password)[^.]{0,30}?(dasso|bhejo|deyo|paao|share)|(dasso|bhejo|deyo|paao|share)[^.]{0,30}?(otp|pin|cvv|password))/g;
+      var fired = false;
+      lower.split(/[.!?\n]+/).forEach(function (s) {
+        if (fired) return;
+        var m;
+        romanPairG.lastIndex = 0;
+        while ((m = romanPairG.exec(s)) !== null) {
+          // Negation before the verb inside the match ("OTP na dasso").
+          if (/((do not|never|don'?t|not|na|mat|nahi)\s+(dasso|bhejo|deyo|paao|share))/.test(m[0])) continue;
+          // Negation after the verb inside the match ("share na karo" in one span).
+          if (/((dasso|bhejo|deyo|paao|share)\s+(na|mat|nahi|not)(\s|$))/.test(m[0])) continue;
+          // Negation immediately before a verb-first match ("na dasso apna OTP").
+          if (/^(dasso|bhejo|deyo|paao|share)/.test(m[0])) {
+            var before = s.slice(Math.max(0, m.index - 12), m.index);
+            if (/((do not|never|don'?t|not|na|mat|nahi)\s*)$/.test(before)) continue;
+          }
+          // Negation immediately after the match ("OTP share" + " na karo").
+          var after = s.slice(m.index + m[0].length, m.index + m[0].length + 12);
+          if (/^\s*(na|mat|nahi|not)(\s|$)/.test(after)) continue;
+          // "share" is shared with English: a verb-first "share"
+          // pair is English's, and a credential-first one counts
+          // only in a sentence carrying a Roman Punjabi word —
+          // otherwise pure-English pairs and the English referral
+          // fallback ("share it with us") would be counted twice.
+          // m[3] is the branch-1 verb, m[4] the branch-2 verb.
+          var pairVerb = m[3] || m[4];
+          if (pairVerb === 'share') {
+            if (m[4] !== undefined) continue;
+            if (!/\b(apna|tuhada|tuhade|tusi|karo|kar|kise|naal|layi|chalu|rakhna|hai|da|di|ji|deo|karke)\b/.test(s)) continue;
+          }
+          fired = true;
+          break;
+        }
+      });
+      if (fired) {
+        hit(30, 'Roman Punjabi OTP request',
+          'Asking for an OTP, PIN or password in Roman Punjabi is the same red flag as in English.');
+      }
+    })();
     if (/\b(inam|jiteya|jitya|vadhai)\b/.test(lower)) {
       hit(25, 'Roman Punjabi prize bait',
         'An unexpected prize in Roman Punjabi is the same bait as in English.');

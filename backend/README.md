@@ -207,6 +207,16 @@ Implemented and demonstrated with tests + live Render checks:
   the headline. Top-level score/verdict/reasons/ai are unchanged. The AI
   now judges the POST-enrichment engine snapshot in URL mode (review
   item 3, option B, decided with this change)
+- Punjabi OTP-request fixes: Gurmukhi rule now accepts Latin
+  credentials with Gurmukhi verbs ("OTP ਸਾਂਝਾ ਕਰੋ" was missed) plus
+  a per-match negation guard (ਨਾ/ਮਤ/ਨਹੀਂ) mirroring Hindi, so
+  Gurmukhi do-not-share warnings no longer score 30; Roman rule
+  gains "share" ("OTP share karo" was missed — English is
+  verb-first only) with the same guard plus anti-double-count rules
+  for the shared verb (verb-first share stays English-only;
+  credential-first share needs a Roman Punjabi word in the
+  sentence, so "share your OTP" and "share it with us" are never
+  counted twice)
 
 Still pending (deployment/coordination steps, not code gaps):
 - AI service deployed 2026-10-31 (Render, `ai-service/` root) and backend
