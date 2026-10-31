@@ -186,7 +186,12 @@ async function post(path, body, port) {
   check('engine score/verdict untouched by AI', r.json.score === 45 && r.json.verdict.level === 'suspicious');
 
   r = await post('/api/analyze', UPI, port);
-  check('clear phishing gets no ai field', !('ai' in r.json) && r.json.score === 95);
+  check('clear phishing gets ai field', r.json.ai && r.json.ai.assessment === 'phishing');
+  check('engine score/verdict untouched by AI on phishing', r.json.score === 95 && r.json.verdict.level === 'phishing');
+
+  const SAFE = { input: 'https://www.amazon.in/gp/order', type: 'url' };
+  r = await post('/api/analyze', SAFE, port);
+  check('safe gets ai field', r.json.ai && r.json.score === 0 && r.json.verdict.level === 'safe');
 
   mode = 'unavailable';
   r = await post('/api/analyze', PRIZE, port);
@@ -195,6 +200,9 @@ async function post(path, body, port) {
   mode = 'down';
   r = await post('/api/analyze', PRIZE, port);
   check('provider down -> field omitted, request still 200', r.status === 200 && !('ai' in r.json));
+
+  r = await post('/api/analyze', SAFE, port);
+  check('provider down on safe scan -> field omitted, request still 200', r.status === 200 && !('ai' in r.json) && r.json.score === 0);
 
   delete process.env.AI_SERVICE_URL;
   r = await post('/api/analyze', PRIZE, port);

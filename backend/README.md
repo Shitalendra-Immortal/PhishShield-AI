@@ -21,7 +21,7 @@ key. Inputs are analyzed in memory and never stored.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | Liveness check: `{ status: "ok", ... }` |
-| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note?, redirectChain?, finalUrl?, threatIntel?, ai? }`. URL mode only: shortener links get redirect-chain analysis, non-official URLs get a URLhaus lookup (see contract). Borderline engine scores (30–59) get an AI second opinion in `ai` when `AI_SERVICE_URL` is set. Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. Rate-limited: 100 requests per 15 minutes per IP (429 `RATE_LIMITED`). |
+| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note?, redirectChain?, finalUrl?, threatIntel?, ai? }`. URL mode only: shortener links get redirect-chain analysis, non-official URLs get a URLhaus lookup (see contract). Every valid scan gets an AI second opinion in `ai` when `AI_SERVICE_URL` is set. Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. Rate-limited: 100 requests per 15 minutes per IP (429 `RATE_LIMITED`). |
 | GET | `/api/samples` | Demo samples for the frontend's "Try a sample" chips. |
 
 Errors are always `{ error: { code, message } }`: `MISSING_INPUT` (400),
@@ -65,7 +65,7 @@ node tests/ai.test.js
 
 `ai.test.js` covers the AI second-opinion client and server wiring against
 local mock AI services (valid/invalid/timeout/unavailable/disabled cases +
-borderline-only gating + stricter backend re-validation: duplicate signal
+all-level AI calls + stricter backend re-validation: duplicate signal
 types, max 5 signals, length caps, non-empty details, assessment/confidence
 vs signals consistency).
 
@@ -117,7 +117,7 @@ analyzer.js     Heuristic engine (identical to the browser draft — do not fork
 rateLimit.js    In-memory rate limiter for /api/analyze
 redirect.js     Redirect-chain follower with SSRF guards
 urlhaus.js      URLhaus (abuse.ch) lookup, best-effort, in-memory cache for definitive results
-ai.js           AI second-opinion client (borderline-only, env-gated, fail-open)
+ai.js           AI second-opinion client (env-gated, fail-open)
 package.json    Express dependency + start script
 tests/          Contract + engine + unit tests
 ```
@@ -156,18 +156,18 @@ Implemented and demonstrated with tests + live Render checks:
   re-validates the AI service's response — duplicate signal types, max 5
   signals, detail/explanation/action length caps, non-empty details, and
   assessment/confidence backed by at least one signal
-- AI second-opinion wiring (borderline engine scores 30–59 only, additive
+- AI second-opinion wiring (every valid scan, additive
   `ai` field, engine verdict never changed) — code + mock tests done
 
 Still pending (deployment/coordination steps, not code gaps):
 - AI service deployed 2026-10-31 (Render, `ai-service/` root) and backend
-  integration verified live: borderline scans gain the `ai` field, safe and
-  phishing scans do not
+  integration verified live for borderline scans; all-level `ai` field
+  coverage pending live verification after this change
 - Restrictive CORS: still open origin for the demo; tightening needs the
   Vercel frontend URL, which is not yet recorded
 - Uptime monitoring: nothing watches the Render services yet
-- Frontend AI second-opinion panel (Member 1): backend returns `ai`, the
-  Result page does not render it yet
+- Frontend AI second-opinion panel (Member 1): the Result page renders
+  the `ai` card with agreement/disagreement display (verified in Frontend2.0)
 - Labelled dataset + precision/recall/F1 (Member 4's deferred corpus work)
 - Frontend rendering of the `ai` second-opinion panel (Member 1)
 - Live 429 demonstration from a single fixed IP (this VM's egress IPs rotate,

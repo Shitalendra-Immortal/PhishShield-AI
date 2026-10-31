@@ -223,9 +223,10 @@ genuine service-level failures. (Malformed JSON bodies return 400
 
 ## How the backend will call it (integration — not Member 3's job now)
 
-- Backend calls this service **only for borderline engine scores (30–59)**.
-  Clear safe and phishing verdicts don't need a second opinion, and this
-  keeps LLM cost and latency out of the main path.
+- Backend calls this service for every valid scan, regardless of score.
+  Every scan pays the AI latency (bounded by the backend's 8 second timeout);
+  on timeout, error, or `available: false`, the field is omitted and the
+  engine verdict stands alone.
 - Backend timeout: 8 seconds. This service uses a 7-second provider
   timeout so it answers inside that window. On timeout, error, or
   `available: false`, the frontend shows the engine verdict alone — the

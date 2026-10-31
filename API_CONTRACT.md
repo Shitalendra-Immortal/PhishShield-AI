@@ -114,7 +114,7 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
 | `redirectChain` | string[] | URL mode only: every URL actually fetched while following a redirect chain, input first. `[]` when no redirect was followed (including when following was skipped or failed). |
 | `finalUrl` | string or null | URL mode only: the last fetched URL in the chain, or `null` when nothing was fetched. |
 | `threatIntel` | object | URL mode only: `{ status, threat }` where `status` is `"listed"` (URL appears in abuse.ch URLhaus), `"clean"` (checked, not listed), or `"unknown"` (lookup failed, skipped, or disabled); `threat` is the URLhaus threat type (e.g. `"malware_download"`) or `null`. |
-| `ai` | object (optional) | Present only when an AI second opinion was obtained: the ENGINE score was borderline (30–59) AND `AI_SERVICE_URL` is configured on the backend AND the AI service answered with `available: true`. Shape: `{ available: true, assessment, confidence, signals: [{ type, detail }], explanation, recommendedAction }` (see the AI service contract). It never changes `score` or `verdict`; when absent, show the engine verdict alone. |
+| `ai` | object (optional) | Present only when an AI second opinion was obtained: `AI_SERVICE_URL` is configured on the backend AND the AI service answered with `available: true`. The backend asks for every valid scan, regardless of score. Shape: `{ available: true, assessment, confidence, signals: [{ type, detail }], explanation, recommendedAction }` (see the AI service contract). It never changes `score` or `verdict`; when absent, show the engine verdict alone. |
 
 **Verdict bands (fixed in v1 — do not change without a contract update)**
 
@@ -157,8 +157,8 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
 - **Sender check (engine):** message mode now flags `"Brand"
   <address@other-domain>` sender-name impersonation (+30 points, Suspicious
   boundary on its own). A brand sender from its official domain is not flagged.
-- **AI second opinion (backend-only, additive):** when the ENGINE score is
-  borderline (30–59) and `AI_SERVICE_URL` is set, the backend asks Member 3's
+- **AI second opinion (backend-only, additive):** for every valid scan, when
+  `AI_SERVICE_URL` is set, the backend asks Member 3's
   AI service for a second opinion (8 second timeout). On success the response
   gains an `ai` field (assessment, confidence, signals, explanation,
   recommended action); on any failure the field is omitted and the engine
