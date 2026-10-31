@@ -39,6 +39,20 @@ const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || '';
 // Backstop against excessive provider usage (each call costs Gemini quota).
 const AI_RATE_LIMIT_MAX = Number(process.env.AI_RATE_LIMIT_MAX) || 100;
 const AI_RATE_LIMIT_WINDOW_MS = Number(process.env.AI_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+// Bound on the rate-limit map itself: without one, a flood of distinct
+// client IPs grows the map without limit (entries only expire lazily).
+// At the cap the oldest bucket is evicted, so memory stays bounded and
+// the limiter keeps working (an evicted IP just gets a fresh bucket).
+const AI_RATE_LIMIT_MAX_ENTRIES = Number(process.env.AI_RATE_LIMIT_MAX_ENTRIES) || 5000;
+// Maximum simultaneous Gemini calls. Each call costs quota and wall
+// time; without a cap a burst of scans fans out into unbounded provider
+// concurrency. When the cap is hit the request answers available: false
+// immediately (fail-open: the engine verdict still shows) instead of
+// queueing — queueing would eat into the backend's 8s timeout and turn
+// a busy moment into timeouts. Per-process: each Render instance has
+// its own cap, same as the rate limiter.
+const MAX_CONCURRENT_GEMINI = Number(process.env.AI_MAX_CONCURRENT) || 5;
+let activeGemini = 0;
 
 const app = express();
 
@@ -56,6 +70,10 @@ function aiRateLimiter(req, res, next) {
   let entry = aiHits.get(key);
   if (!entry || entry.reset <= now) {
     entry = { count: 0, reset: now + AI_RATE_LIMIT_WINDOW_MS };
+    if (!aiHits.has(key) && aiHits.size >= AI_RATE_LIMIT_MAX_ENTRIES) {
+      // Evict the oldest bucket (Map preserves insertion order).
+      aiHits.delete(aiHits.keys().next().value);
+    }
     aiHits.set(key, entry);
   }
   entry.count += 1;
@@ -129,7 +147,18 @@ app.post('/ai/analyze', requireServiceKey, aiRateLimiter, async (req, res) => {
       return res.json(unavailableResponse());
     }
 
-    const result = await analyzeWithGemini(input, engine);
+    // Concurrency cap, fail-open: a busy service still answers, just
+    // without the AI opinion, instead of stacking up provider calls.
+    if (activeGemini >= MAX_CONCURRENT_GEMINI) {
+      return res.json(unavailableResponse());
+    }
+    activeGemini += 1;
+    let result;
+    try {
+      result = await analyzeWithGemini(input, engine);
+    } finally {
+      activeGemini -= 1;
+    }
     if (!result) {
       return res.json(unavailableResponse());
     }

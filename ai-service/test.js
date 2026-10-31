@@ -11,6 +11,7 @@ const {
   SYSTEM_PROMPT,
   parseAiOutput,
   validateAiOutput,
+  independentSignalCount,
 } = require('./prompt');
 
 let failures = 0;
@@ -55,6 +56,85 @@ const highWithOneSignal = validateAiOutput({
 check(
   'high confidence with one signal is downgraded to medium, not failed',
   highWithOneSignal.ok === true && highWithOneSignal.data.confidence === 'medium',
+);
+
+// Independence: two signals from the same cluster are one piece of
+// evidence, so high confidence is downgraded; two clusters keep it.
+const sig = (type) => ({ type, detail: `Evidence of ${type}.` });
+const clusteredHigh = (types) => validateAiOutput({ ...validPrize, signals: types.map(sig) });
+check(
+  'high from urgency + deadline (one pressure tactic) is downgraded to medium',
+  clusteredHigh(['manufactured_urgency', 'fake_deadline']).data.confidence === 'medium',
+);
+check(
+  'high from urgency + threat (one pressure tactic) is downgraded to medium',
+  clusteredHigh(['manufactured_urgency', 'pressure_to_act']).data.confidence === 'medium',
+);
+check(
+  'high from impersonation + false authority (one identity claim) is downgraded to medium',
+  clusteredHigh(['impersonation', 'false_authority']).data.confidence === 'medium',
+);
+check(
+  'high from urgency + credential request (two clusters) stays high',
+  clusteredHigh(['manufactured_urgency', 'credential_request']).data.confidence === 'high',
+);
+check(
+  'high from urgency + deadline + credential request (two clusters) stays high',
+  clusteredHigh(['manufactured_urgency', 'fake_deadline', 'credential_request']).data.confidence === 'high',
+);
+check(
+  'high from impersonation + unusual sender stays high (sender mismatch is a separate observable)',
+  clusteredHigh(['impersonation', 'unusual_sender']).data.confidence === 'high',
+);
+check(
+  'independentSignalCount counts clusters once',
+  independentSignalCount([
+    { type: 'manufactured_urgency' }, { type: 'fake_deadline' }, { type: 'prize_lure' },
+  ]) === 2,
+);
+check(
+  'system prompt teaches independence, not just signal count',
+  SYSTEM_PROMPT.includes('INDEPENDENT pieces of evidence') && SYSTEM_PROMPT.includes('one pressure tactic'),
+);
+
+// Cross-field validation: the verdict must cohere with its signals.
+const crossField = (assessment, confidence, types) => validateAiOutput({
+  assessment, confidence,
+  signals: types.map(sig),
+  explanation: 'An explanation grounded in the input.',
+  recommendedAction: 'Verify through official channels.',
+});
+check(
+  'safe with no signals is accepted',
+  crossField('safe', 'low', []).ok === true,
+);
+check(
+  'phishing with no signals is rejected, not shown evidence-free',
+  crossField('phishing', 'high', []).ok === false,
+);
+check(
+  'safe with credential request + impersonation is downgraded to suspicious, not phishing',
+  (() => { const r = crossField('safe', 'medium', ['credential_request', 'impersonation']); return r.ok === true && r.data.assessment === 'suspicious'; })(),
+);
+check(
+  'safe with credential request + false authority is downgraded too (same identity cluster)',
+  (() => { const r = crossField('safe', 'medium', ['credential_request', 'false_authority']); return r.ok === true && r.data.assessment === 'suspicious'; })(),
+);
+check(
+  'safe with a credential request alone stays safe (legitimate contexts are not forced)',
+  (() => { const r = crossField('safe', 'low', ['credential_request']); return r.ok === true && r.data.assessment === 'safe'; })(),
+);
+check(
+  'safe with impersonation alone stays safe (the table only flags the pair)',
+  (() => { const r = crossField('safe', 'low', ['impersonation']); return r.ok === true && r.data.assessment === 'safe'; })(),
+);
+check(
+  'suspicious with one weak indicator and high confidence is accepted at medium',
+  (() => { const r = crossField('suspicious', 'high', ['unusual_sender']); return r.ok === true && r.data.assessment === 'suspicious' && r.data.confidence === 'medium'; })(),
+);
+check(
+  'suspicious with one weak indicator and low confidence stays low',
+  (() => { const r = crossField('suspicious', 'low', ['unusual_sender']); return r.ok === true && r.data.confidence === 'low'; })(),
 );
 
 const loneUrlPhishing = validateAiOutput({
@@ -235,6 +315,60 @@ async function runServerTests() {
   check('rate limit: 3rd call -> 429', r.status === 429 && r.json.error.code === 'RATE_LIMITED');
   check('rate limit: Retry-After header present', r.headers.get('retry-after') !== null);
   await closeSrv(srv3);
+
+  // Instance 4: concurrency cap (slow mock Gemini, max 2).
+  const slowGemini = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      setTimeout(() => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(MOCK_AI_OUT) }] } }] }));
+      }, 400);
+    });
+  });
+  await new Promise((r) => slowGemini.listen(0, r));
+  process.env.GEMINI_API_KEY = 'test-dummy-key';
+  process.env.GEMINI_API_BASE_URL = 'http://localhost:' + slowGemini.address().port;
+  process.env.GEMINI_MODEL = 'test-model';
+  delete process.env.AI_SERVICE_KEY;
+  delete process.env.AI_RATE_LIMIT_MAX;
+  process.env.AI_MAX_CONCURRENT = '2';
+  delete require.cache[require.resolve('./server')];
+  const app4 = require('./server');
+  const srv4 = await listen(app4);
+  const port4 = srv4.address().port;
+  const parallel = await Promise.all([
+    postAnalyze(port4, SAMPLE_REQ, {}),
+    postAnalyze(port4, SAMPLE_REQ, {}),
+    postAnalyze(port4, SAMPLE_REQ, {}),
+  ]);
+  const withAi = parallel.filter((r) => r.json && r.json.available === true).length;
+  const withoutAi = parallel.filter((r) => r.json && r.json.available === false).length;
+  check('concurrency: 2 of 3 parallel calls get an AI opinion at cap 2', withAi === 2);
+  check('concurrency: the over-cap call fails open (available:false, no 500)', withoutAi === 1);
+  await closeSrv(srv4);
+  await new Promise((resolve) => slowGemini.close(resolve));
+
+  // Instance 5: bounded rate-limit map (small cap, distinct IPs via
+  // X-Forwarded-For, which the service trusts behind Render's proxy).
+  process.env.GEMINI_API_BASE_URL = geminiUrl;
+  process.env.AI_RATE_LIMIT_MAX = '2';
+  process.env.AI_RATE_LIMIT_MAX_ENTRIES = '3';
+  delete process.env.AI_MAX_CONCURRENT;
+  delete require.cache[require.resolve('./server')];
+  const app5 = require('./server');
+  const srv5 = await listen(app5);
+  const port5 = srv5.address().port;
+  const fromIp = (ip) => postAnalyze(port5, SAMPLE_REQ, { 'X-Forwarded-For': ip });
+  await fromIp('10.1.0.1'); await fromIp('10.1.0.1');
+  let r5 = await fromIp('10.1.0.1');
+  check('cap test: 3rd call from same IP -> 429', r5.status === 429);
+  await fromIp('10.1.0.2'); await fromIp('10.1.0.3');
+  await fromIp('10.1.0.4'); // evicts the oldest bucket (10.1.0.1)
+  r5 = await fromIp('10.1.0.1');
+  check('cap test: evicted IP gets a fresh bucket instead of staying blocked', r5.status === 200);
+  await closeSrv(srv5);
 
   await new Promise((resolve) => gemini.close(resolve));
 }

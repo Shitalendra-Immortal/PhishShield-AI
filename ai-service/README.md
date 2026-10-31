@@ -103,7 +103,12 @@ Field rules:
   support the assessment; medium for one strong signal; low otherwise,
   including when disagreeing with the engine on thin evidence.
   `server.js` enforces the high-confidence rule as a guardrail, not just
-  in the prompt.
+  in the prompt. "Independent" is enforced, not just asserted: signals
+  describing the same behaviour count once — a rush, a deadline, and a
+  threat are one pressure tactic (`manufactured_urgency`, `fake_deadline`,
+  `pressure_to_act`); an authority claim and impersonation are one
+  false-identity claim (`false_authority`, `impersonation`). Every other
+  signal type counts on its own.
 - `signals`: array of `{ type, detail }`, each type from the fixed
   vocabulary below. `detail` is one plain sentence grounded in the input.
 - `explanation`: 2–3 plain sentences, no jargon, no invented details.
@@ -112,7 +117,11 @@ Field rules:
 Validation rejects duplicate signal types, more than 5 signals, details
 over 500 characters, explanations over 1000 characters, and recommended
 actions over 300 characters. Rejected output is retried once, then the
-service answers `available: false`.
+service answers `available: false`. Cross-field rules: a phishing verdict
+with no signals is rejected; a safe verdict listing a credential request
+plus a false-identity signal (`impersonation` or `false_authority`) is
+downgraded to suspicious, never to phishing, and a credential request on
+its own never triggers that downgrade.
 
 Signal vocabulary (fixed in v1 — do not invent new types without a
 contract update):
@@ -158,6 +167,18 @@ genuine service-level failures. (Malformed JSON bodies return 400
   reveals the key). When unset, the endpoint is open (local dev only).
 - Rate limit: 100 `/ai/analyze` requests per 15 minutes per IP (env
   `AI_RATE_LIMIT_MAX` / `AI_RATE_LIMIT_WINDOW_MS`), 429 with `Retry-After`.
+  The bucket map itself is bounded (`AI_RATE_LIMIT_MAX_ENTRIES`, default
+  5000): at the cap the oldest bucket is evicted, so a flood of distinct
+  IPs cannot grow memory without limit.
+- Concurrency cap: at most `AI_MAX_CONCURRENT` (default 5) simultaneous
+  Gemini calls. Over the cap, `/ai/analyze` answers `available: false`
+  immediately (fail-open: the engine verdict still shows) instead of
+  queueing, which would eat into the backend's 8s timeout.
+- Keys stay server-side: `GEMINI_API_KEY` lives only in this service's
+  env, and `AI_SERVICE_KEY` only in this service's and the backend's env.
+  Neither ever goes into frontend variables (`VITE_*`) or the frontend
+  bundle — the frontend talks to the backend only, never to this service
+  or to Gemini directly.
 
 ## Prompt rules (in prompt.js)
 
@@ -224,8 +245,11 @@ npm test
 
 Live checks (with a key configured) — the service must return valid JSON
 (or run the scripted bar: start the service with a key, then
-`node live-test.js` — 11 cases: cases 1-5 below, one Hinglish case, and five
-injection variants).
+`node live-test.js` — 21 cases: cases 1-5 below, one Hinglish case, five
+injection variants, plus legit transaction alerts, delivery
+notifications, payment reminders, electricity scams, Devanagari Hindi,
+mixed Hindi-English, multi-URL messages, brand mentions in warnings,
+lone suspicious URLs, and contradictory evidence).
 for all six, and a safe↔phishing flip on a clear case is a bug; a
 one-band disagreement on a borderline case is acceptable if explained:
 
@@ -251,6 +275,37 @@ curl -X POST http://localhost:4000/ai/analyze \
   -H 'Content-Type: application/json' \
   -d '{"input": "Congratulations! You have won Rs 50,000 Paytm cashback. Claim now: bit.ly/xyz123", "engine": {"kind": "message", "score": 45, "verdict": {"level": "suspicious", "label": "Suspicious"}, "reasons": [{"label": "Prize bait", "points": 25}]}}'
 ```
+
+## Labelled dataset (accuracy measurement, not a gate)
+
+Passing a small fixed test set does not establish real-world accuracy.
+`live-test.js` is the gating bar (21 cases, must all pass). `dataset.json`
++ `dataset-test.js` measure accuracy over a larger labelled set instead:
+
+```bash
+node dataset-test.js
+# Or: AI_URL=http://localhost:4000 AI_SERVICE_KEY=xxx node dataset-test.js
+# Optional gate: MIN_ACCURACY=0.8 node dataset-test.js
+```
+
+- 53 cases across scam types (KYC, prize, electricity, delivery, job,
+  lottery, APK, SIM, refund, bank impersonation), legitimate types (OTP,
+  transactions, delivery, reminders, warnings, official links), languages
+  (English, Hinglish, Punjabi Gurmukhi/Roman, Devanagari Hindi, mixed),
+  and edge cases (lone URLs, multi-URL messages, brand mentions,
+  contradictory evidence, prompt injection).
+- Cases carry expected assessment + confidence *sets*, not point
+  predictions, because several rules are bounds: a lone odd URL must
+  never be phishing (safe or suspicious both comply), and tone alone
+  is at most suspicious at low/medium confidence.
+- Cases are sent without an engine result, so this measures the AI's
+  standalone judgment. Requests are sequential (under the rate limit
+  and concurrency cap).
+- Output is per-category and per-language accuracy plus a failure list.
+  `available: false` answers are reported separately and excluded from
+  the accuracy denominator (accuracy measures judgment, not uptime).
+  Without `MIN_ACCURACY` the script exits 0 on a completed run — it
+  measures, it does not gate.
 
 Example (service key configured — add the header, or expect 401):
 
