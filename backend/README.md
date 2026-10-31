@@ -155,6 +155,32 @@ Implemented and demonstrated with tests + live Render checks:
   English and Hindi OTP-request rules now skip negated warnings per match
   ("do not share your OTP", "OTP मत बताएं") while still catching the
   "share it with us" referral trick
+- Fake-testimonial reward lure (+30): a first-person money-received claim
+  ("mil gaye", "got", "received") plus an urge for others to try it
+  ("tum log bhi try karo", "you guys try") plus a link — the
+  referral-scam shape; bank alerts (no urge, no link) and link-less
+  claims do not fire
+- P0 audit fixes: ID-document request rule (+30, Aadhaar/PAN/bank/card
+  details + share/send/provide/submit/enter/give, with negation guard;
+  "tell" and "about" phrasings excluded); KYC completion guards
+  (English "is complete/completed", Hindi/Punjabi complete + done
+  marker) so receipts no longer read suspicious; brand + action rule
+  ignores "update you/us/me" status notifications; customs +
+  clearance fees join the upfront-fee list; profit bait covers
+  "double your bitcoin/btc/crypto"
+- Brand matching is token-based, not substring: a brand fires only
+  when it IS a host token or STARTS one (dot labels, then hyphen
+  tokens, after leetspeak normalisation). Substring matching fired
+  inside unrelated words ("upi" in "stupid"/"cupinfo"/"ubuntupit",
+  "sbi" in "massbio"/"ridethisbike", "apple" in "thebigapplegirl")
+  — the combined evaluation's biggest false-positive source.
+  Official domains extended with airtel.in, airtelxstream.in, jio.com
+  and amazonaws.cn (AWS China); pnb.com.ph deliberately left flagged
+  as an abbreviation collision (Philippine vs Punjab National Bank).
+  Bare-link extraction fixed in the same change: it truncated
+  multi-label domains to two labels ("i.airtel.in/2gb_rc2" became
+  "i.airtel"), so message-mode checks ran on a wrong host; it now
+  captures all labels and still ignores email addresses
 - SSRF pinning for redirect fetches: each hop resolves once and the
   connection is pinned to a validated address (no second DNS lookup, so
   DNS rebinding cannot steer a fetch to a private host); hostname still

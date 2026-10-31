@@ -14,11 +14,14 @@
     'onlinesbi.com': 'SBI', 'npci.org.in': 'NPCI', 'uidai.gov.in': 'UIDAI',
     'icicibank.com': 'ICICI Bank', 'axisbank.com': 'Axis Bank', 'kotak.com': 'Kotak',
     'paytm.com': 'Paytm', 'phonepe.com': 'PhonePe', 'whatsapp.com': 'WhatsApp',
-    'telegram.org': 'Telegram', 'irctc.co.in': 'IRCTC', 'flipkart.com': 'Flipkart'
+    'telegram.org': 'Telegram', 'irctc.co.in': 'IRCTC', 'flipkart.com': 'Flipkart',
+    'airtel.in': 'Airtel', 'airtelxstream.in': 'Airtel Xstream',
+    'jio.com': 'Jio', 'amazonaws.cn': 'Amazon'
   };
 
-  // Brand names scammers impersonate. If the host contains one but is NOT the
-  // official domain, that is impersonation. Leetspeak is normalised first
+  // Brand names scammers impersonate. If a host token IS one, or
+  // STARTS with one, but the host is NOT the official domain, that
+  // is impersonation. Leetspeak is normalised first
   // (paypa1 -> paypal) so simple typosquats are caught too.
   var BRANDS = ['paypal', 'google', 'amazon', 'facebook', 'instagram', 'apple',
     'microsoft', 'netflix', 'sbi', 'hdfc', 'icici', 'axis', 'kotak', 'paytm',
@@ -79,7 +82,13 @@
 
   function extractUrls(text) {
     var m = text.match(/https?:\/\/[^\s<>")]+/gi) || [];
-    var bare = text.match(/(?:^|[\s(])([a-z0-9-]+\.[a-z]{2,}(?:\/[^\s<>")]+)?)/gi) || [];
+    // Bare domains: capture ALL labels, not just two. The old pattern
+    // ([a-z0-9-]+\.[a-z]{2,}) truncated "i.airtel.in/2gb_rc2" to
+    // "i.airtel", so message-mode checks ran on a wrong host — the
+    // brand check then fired on "airtel" even though the real host is
+    // an official domain. This truncation also hit every bare
+    // subdomain link ("www.example.com" became "www.example").
+    var bare = text.match(/(?:^|[\s(])([a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s<>")]+)?)/gi) || [];
     bare.forEach(function (b) {
       var t = b.trim().replace(/^\(/, '');
       if (t.indexOf('http') !== 0 && t.indexOf('.') > 0) m.push('https://' + t);
@@ -164,10 +173,29 @@
       hit(10, 'Hyphen-stuffed domain (' + hyphens + ' hyphens)',
         'Real brand domains rarely stack hyphens like this; fakes do.');
     }
+    // Brand matching is token-based, not substring. Split the
+    // (leetspeak-normalised) host into dot labels, then hyphen tokens,
+    // and fire only when a brand IS a token or STARTS a token. Plain
+    // substring matching fired inside unrelated words ("upi" in
+    // "stupid", "cupinfo", "ubuntupit"; "sbi" in "massbio",
+    // "ridethisbike"; "apple" in "thebigapplegirl") — the combined
+    // evaluation's biggest false-positive source, measured on the
+    // PhiUSIIL sample before this change. Glued prefixes
+    // ("paypallogin", "sbiupdate") still fire: that is a real
+    // phishing shape. Accepted ambiguity in the other direction: a
+    // token starting with a brand ("appletozucchini") still fires,
+    // because it is structurally identical to a phishing shape.
     var plain = deleet(hostNoWww);
+    var hostTokens = [];
+    plain.split('.').forEach(function (label) {
+      label.split('-').forEach(function (tok) { if (tok) hostTokens.push(tok); });
+    });
     var impersonated = null;
     BRANDS.forEach(function (b) {
-      if (!impersonated && plain.indexOf(b) !== -1) impersonated = b;
+      if (impersonated) return;
+      hostTokens.forEach(function (tok) {
+        if (!impersonated && tok.indexOf(b) === 0) impersonated = b;
+      });
     });
     if (impersonated) {
       hit(30, 'Brand name "' + impersonated + '" in an unofficial domain',
@@ -229,6 +257,21 @@
       hit(25, 'Prize / reward bait',
         'Unexpected prizes are bait to get a click or a fee.');
     }
+    // Fake-testimonial reward lure: "Mujhe laga tha fake hai par sach
+    // me Rs 2000 mil gaye, tum log bhi try karo!" + a link. A
+    // first-person money-received claim plus an urge for others to
+    // try it, with a link to follow, is the referral-scam shape: the
+    // "proof" is the bait and the link is the trap. The link is
+    // required on purpose — a bank alert ("Rs 10,000 credited") has
+    // no urge and no link, and a bare claim with no link could be a
+    // genuine friend's referral, so neither fires.
+    var testimonialReward = /(mujhe|mujhko|maine|i)\b[^.]{0,50}(mil gaya|mil gaye|mila|received|got)\b[^.]{0,30}(₹|rs\.?|rupees|\$|inr)/.test(lower) ||
+      /(₹|rs\.?|rupees|\$|inr)\s?[\d,]+[^.]{0,30}(mil gaya|mil gaye|mila)/.test(lower);
+    var referralUrge = /(tum log bhi|tum bhi|aap bhi|try karo|try it|you (guys|all) (try|too)|bhi try|share (this|it) with|forward (this|it) to)/.test(lower);
+    if (testimonialReward && referralUrge && extractUrls(text).length > 0) {
+      hit(30, 'Fake testimonial reward lure',
+        'An "I got the money, you try too" story plus a link is how referral scams spread — real payouts do not arrive through random links.');
+    }
     // Legit-OTP negation: the old test matched "share ... OTP" even in
     // "Do not share this OTP", turning a legit OTP notice into
     // 30/suspicious. Each proximity match is now checked: if the verb
@@ -264,13 +307,54 @@
           'No real bank or company ever asks for these. This alone is a red flag.');
       }
     })();
+    // ID-document request: Aadhaar / PAN / bank / card details asked
+    // for over a message, in either order, Roman Hindi included
+    // ("Aadhaar share karo" matches: the tokens are Latin). Same
+    // philosophy as the OTP rule: one strong signal reaches the
+    // suspicious band. "tell" is deliberately NOT a verb here —
+    // "tell me about Aadhaar" is a discussion, not a handover — and a
+    // match whose filler contains "about" is skipped for the same
+    // reason. Negated warnings ("Never share your Aadhaar") are
+    // skipped, mirroring the OTP guard.
+    (function () {
+      var negBefore = /(do not|never|don'?t|do n'?t|not)\s+(ever\s+)?$/;
+      var nouns = '(aadhaar|aadhar|pan card|pan number|pan details|bank details|account details|card details|passport|voter id|driving licen[cs]e)';
+      var verbs = '(share|send|provide|submit|enter|give)';
+      var re = new RegExp('(' + verbs + ')[^.]{0,30}?(' + nouns + ')|(' + nouns + ')[^.]{0,30}?(' + verbs + ')', 'g');
+      var m, fired = false;
+      while ((m = re.exec(lower)) !== null) {
+        var before = lower.slice(Math.max(0, m.index - 12), m.index);
+        if (negBefore.test(before)) continue;
+        if (/\babout\b/.test(m[0])) continue;
+        if (new RegExp(verbs + '\\s+(not|never)\\b').test(m[0])) continue;
+        var after = lower.slice(m.index + m[0].length, m.index + m[0].length + 10);
+        if (/^\s*(not|never)\b/.test(after)) continue;
+        fired = true;
+        break;
+      }
+      if (fired) {
+        hit(30, 'Asks you to share ID documents',
+          'No real bank or company asks for Aadhaar, PAN or bank details over a message. This alone is a red flag.');
+      }
+    })();
+    // KYC completion guard: "update is complete" is a receipt, not a
+    // push. Without it, a routine completion notice ("Your KYC update
+    // is complete") scored 30/suspicious. Pushes say "complete" (do
+    // your KYC); receipts say "completed" / "is complete" — the guard
+    // only matches receipt phrasing, so pushes still fire.
     if (/(kyc|know your customer)/.test(lower) &&
-        /(update|complete|verify|pending|incomplete|expire)/.test(lower)) {
+        /(update|complete|verify|pending|incomplete|expire)/.test(lower) &&
+        !/(is complete|completed|successfully updated|updated successfully)/.test(lower)) {
       hit(20, 'KYC update trick',
         'Fake KYC messages are the top UPI-era scam in India.');
     }
-    if (/(bank|sbi|hdfc|icici|paytm|phonepe|upi)/.test(lower) &&
-        /(blocked|verify|update|link|reactivate|expired|deactivated)/.test(lower)) {
+    // "We will update you on the status" is a notification, not a
+    // push: strip "update you/us/me" before testing, so a status
+    // update no longer trips the brand + action rule. "Update your
+    // KYC" (update + your) still fires.
+    var lowerNoUpdateYou = lower.replace(/update\s+(you|us|me)\b/g, '');
+    if (/(bank|sbi|hdfc|icici|paytm|phonepe|upi)/.test(lowerNoUpdateYou) &&
+        /(blocked|verify|update|link|reactivate|expired|deactivated)/.test(lowerNoUpdateYou)) {
       hit(10, 'Financial brand + alarming action',
         'Combines a trusted money brand with an action you are pushed to take.');
     }
@@ -302,7 +386,8 @@
       hit(30, 'Punjabi OTP request',
         'Asking for an OTP, PIN or password in Punjabi is the same red flag as in English.');
     }
-    if (/(ਕੇਵਾਈਸੀ|KYC)[^.।]{0,25}(ਅਪਡੇਟ|ਪੂਰਾ|ਪੂਰੀ|ਵੈਰੀਫਾਈ|ਬਕਾਇਆ|ਅਧੂਰਾ|ਅਧੂਰੀ|ਖਤਮ)/.test(lower)) {
+    if (/(ਕੇਵਾਈਸੀ|KYC)[^.।]{0,25}(ਅਪਡੇਟ|ਪੂਰਾ|ਪੂਰੀ|ਵੈਰੀਫਾਈ|ਬਕਾਇਆ|ਅਧੂਰਾ|ਅਧੂਰੀ|ਖਤਮ)/.test(lower) &&
+        !/(ਪੂਰਾ|ਪੂਰੀ)\s+(ਹੋ ਗਈ|ਹੋ ਗਿਆ)/.test(lower)) {
       hit(20, 'Punjabi KYC trick',
         'A KYC update push written in Punjabi, the top UPI-era scam pattern.');
     }
@@ -396,7 +481,8 @@
     // are already caught once by the English check (Latin KYC + Latin
     // action) or by this rule's Devanagari arm, so this never counts
     // one KYC trick twice. "KYC update karo" stays exactly 20.
-    if (/(केवाईसी[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म|update|verify|pending|incomplete|expire|complete)|kyc[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म))/.test(lower)) {
+    if (/(केवाईसी[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म|update|verify|pending|incomplete|expire|complete)|kyc[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म))/.test(lower) &&
+        !/(पूरी|पूरा|अपडेट)\s+(हो गई|हो गया)/.test(lower)) {
       hit(20, 'Hindi KYC trick',
         'A KYC update push written in Hindi, the top UPI-era scam pattern.');
     }
@@ -422,11 +508,11 @@
       hit(25, 'Fake police / arrest threat',
         'A law-enforcement threat used to force an urgent payment.');
     }
-    if (/(registration fee|processing fee|delivery fee|advance fee)/.test(lower)) {
+    if (/(registration fee|processing fee|delivery fee|advance fee|customs fee|clearance fee)/.test(lower)) {
       hit(20, 'Upfront fee request',
         'Real jobs, loans and deliveries do not demand a fee up front to release money or a parcel.');
     }
-    if (/(guaranteed profit|double your money|double.*money.*days|100% profit)/.test(lower)) {
+    if (/(guaranteed profit|double your (money|bitcoin|btc|crypto)|double.*money.*days|100% profit)/.test(lower)) {
       // 30, not 25: a guaranteed-profit claim on its own reaches the
       // suspicious band, like an OTP request does.
       hit(30, 'Guaranteed-profit investment bait',
