@@ -171,6 +171,14 @@ check(
   SYSTEM_PROMPT.includes('Punjabi') && SYSTEM_PROMPT.includes('ਬੰਦ ਹੋ ਜਾਵੇਗਾ'),
 );
 check(
+  'system prompt covers Devanagari Hindi understanding',
+  SYSTEM_PROMPT.includes('Devanagari') && SYSTEM_PROMPT.includes('ओटीपी साझा करें'),
+);
+check(
+  'system prompt covers mixed-script messages',
+  SYSTEM_PROMPT.includes('Mixed-language') && SYSTEM_PROMPT.includes('across ALL scripts'),
+);
+check(
   'system prompt distinguishes mention from impersonation',
   SYSTEM_PROMPT.includes('mention is not impersonation'),
 );

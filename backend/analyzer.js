@@ -123,7 +123,10 @@
         'Real companies link to their domain, not a raw IP like ' + host + '.');
     }
     if (url.indexOf('@') !== -1) {
-      hit(20, '@ symbol in the URL',
+      // An @ URL hides the real host entirely, so it reaches the
+      // suspicious band on its own (20 + an 8-point weak word = 28,
+      // safe, was a miss).
+      hit(30, '@ symbol in the URL',
         'Everything before @ is ignored by browsers, so the real destination is hidden.');
     }
     if (SHORTENERS.indexOf(hostNoWww) !== -1) {
@@ -226,10 +229,41 @@
       hit(25, 'Prize / reward bait',
         'Unexpected prizes are bait to get a click or a fee.');
     }
-    if (/(share|send|tell|provide|enter)[^.]{0,25}(otp|pin|cvv|password)/.test(lower)) {
-      hit(30, 'Asks you to share an OTP, PIN or password',
-        'No real bank or company ever asks for these. This alone is a red flag.');
-    }
+    // Legit-OTP negation: the old test matched "share ... OTP" even in
+    // "Do not share this OTP", turning a legit OTP notice into
+    // 30/suspicious. Each proximity match is now checked: if the verb
+    // is preceded (within ~12 chars) by "do not", "never", "don't" or
+    // "not" (allowing an intensifier, "do not ever share"), that match
+    // is a warning, not a request, and is skipped. The window is lazy
+    // on purpose: a greedy window would swallow a second pair ("Do
+    // not share your OTP, share your PIN") and let the negation inside
+    // it block the real request. Plus a narrow
+    // fallback for the trick "do not share your OTP with anyone, share
+    // it with us" — the second share has no OTP in the same sentence,
+    // but refers back to it, so a non-negated "share it with us" + an
+    // OTP anywhere in the message also fires.
+    (function () {
+      var negBefore = /(do not|never|don'?t|do n'?t|not)\s+(ever\s+)?$/;
+      var re = /(share|send|tell|provide|enter)[^.]{0,25}?(otp|pin|cvv|password)/g;
+      var m, fired = false;
+      while ((m = re.exec(lower)) !== null) {
+        var before = lower.slice(Math.max(0, m.index - 12), m.index);
+        if (negBefore.test(before)) continue;
+        fired = true;
+        break;
+      }
+      if (!fired && /(otp|pin|cvv|password)/.test(lower) &&
+          /\bshare (it|this|that) with (us|me|them|him|her)\b/.test(lower)) {
+        // Only fire if that "share with us" is itself non-negated.
+        var s = lower.match(/\bshare (it|this|that) with (us|me|them|him|her)\b/);
+        var sb = lower.slice(Math.max(0, s.index - 12), s.index);
+        if (!negBefore.test(sb)) fired = true;
+      }
+      if (fired) {
+        hit(30, 'Asks you to share an OTP, PIN or password',
+          'No real bank or company ever asks for these. This alone is a red flag.');
+      }
+    })();
     if (/(kyc|know your customer)/.test(lower) &&
         /(update|complete|verify|pending|incomplete|expire)/.test(lower)) {
       hit(20, 'KYC update trick',
@@ -294,6 +328,113 @@
     if (/\b(inam|jiteya|jitya|vadhai)\b/.test(lower)) {
       hit(25, 'Roman Punjabi prize bait',
         'An unexpected prize in Roman Punjabi is the same bait as in English.');
+    }
+    // Hindi (Devanagari script), mirroring the English checks the way
+    // the Punjabi block does. Devanagari words are script-distinct, so
+    // they take the full English point values. Hindi is SOV, so a
+    // credential usually precedes its verb ("ओटीपी साझा करें"), but
+    // mixed Hindi-English messages use either order, so the credential
+    // rule matches both orders and accepts Latin tokens on either side
+    // ("अपना OTP साझा करें"). A pair with no Devanagari character at
+    // all is plain English, already covered by the English rule, so it
+    // is excluded here and never double-counted. A do-not-share
+    // warning ("साझा न करें", "OTP मत बताएं") is NOT a request: the
+    // negation, before or after the verb, blocks that match, checked
+    // per match so a mixed warning-plus-request message still scores
+    // on its request.
+    if (/(तुरंत|अभी|जल्दी|फौरन|तत्काल)/.test(lower)) {
+      hit(15, 'Hindi urgency words',
+        'Hindi pressure words (turant, abhi, jaldi) rush you the same way English urgency does.');
+    }
+    if (/(खाता बंद|बंद हो जाएगा|बंद हो जायेगा|ब्लॉक हो जाएगा|अकाउंट बंद|खाता ब्लॉक)/.test(lower)) {
+      hit(10, 'Hindi account-block threat',
+        'A closure threat written in Hindi, the same lever as the English version.');
+    }
+    if (/(बधाई|लॉटरी|इनाम|पुरस्कार|कैशबैक|जीती|जीता|जीते)/.test(lower)) {
+      hit(25, 'Hindi prize bait',
+        'An unexpected prize in Hindi is the same bait as in English.');
+    }
+    // Hindi OTP / bank-info request, checked per match: a negated pair
+    // ("OTP मत बताएं", "OTP साझा न करें") is a warning and is
+    // skipped, but a real pair in the same sentence still fires.
+    // The windows are lazy on purpose: a greedy window would swallow
+    // a second pair ("OTP मत बताएं, OTP भेजो") and let the negation
+    // inside it block the real request.
+    // "डालें" (enter) joins the verbs, matching the English rule's
+    // "enter". A pair with no Devanagari character is plain English,
+    // already covered by the English rule, so it is excluded here and
+    // never double-counted.
+    var hindiCredVerbs = '(साझा|भेजें|भेजो|बताएं|बताओ|दें|दो|डालें)';
+    var hindiCredPairG = /((ओटीपी|otp|पिन|pin|पासवर्ड|password|सीवीवी|cvv|बैंक जानकारी|bank details|bank info|खाता विवरण|account details)[^.।!?]{0,30}?(साझा|भेजें|भेजो|बताएं|बताओ|दें|दो|डालें|share|send|tell)|(साझा|भेजें|भेजो|बताएं|बताओ|दें|दो|डालें|share|send|tell)[^.।!?]{0,30}?(ओटीपी|otp|पिन|pin|पासवर्ड|password|सीवीवी|cvv|बैंक जानकारी|bank details|bank info|खाता विवरण|account details))/g;
+    var hindiOtpHit = lower.split(/[।.!?\n]+/).some(function (s) {
+      var m, fired = false;
+      hindiCredPairG.lastIndex = 0;
+      while ((m = hindiCredPairG.exec(s)) !== null) {
+        if (!/[\u0900-\u097F]/.test(m[0])) continue;
+        // Negation before the verb inside the match ("OTP मत बताएं").
+        if (new RegExp('(मत|न)\\s+' + hindiCredVerbs).test(m[0])) continue;
+        // Negation after the verb inside the match ("साझा न करें" in one span).
+        if (new RegExp(hindiCredVerbs + '\\s+(नहीं|न|मत|ना)(\\s|$)').test(m[0])) continue;
+        // Negation immediately before a verb-first match ("मत बताएं अपना OTP").
+        if (new RegExp('^' + hindiCredVerbs).test(m[0])) {
+          var before = s.slice(Math.max(0, m.index - 4), m.index);
+          if (/(मत|न)\s*$/.test(before)) continue;
+        }
+        // Negation immediately after the match ("OTP साझा" + " न करें").
+        var after = s.slice(m.index + m[0].length, m.index + m[0].length + 12);
+        if (/^\s*(नहीं|न|मत|ना)(\s|$)/.test(after)) continue;
+        fired = true;
+        break;
+      }
+      return fired;
+    });
+    if (hindiOtpHit) {
+      hit(30, 'Hindi OTP / bank-info request',
+        'Asking for an OTP, PIN, password or bank details in Hindi is the same red flag as in English.');
+    }
+    // Cross-script pairs only, plus pure Devanagari: same-script pairs
+    // are already caught once by the English check (Latin KYC + Latin
+    // action) or by this rule's Devanagari arm, so this never counts
+    // one KYC trick twice. "KYC update karo" stays exactly 20.
+    if (/(केवाईसी[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म|update|verify|pending|incomplete|expire|complete)|kyc[^.।!?]{0,25}(अपडेट|पूरा|पूरी|वेरिफाई|बकाया|अधूरा|अधूरी|खत्म))/.test(lower)) {
+      hit(20, 'Hindi KYC trick',
+        'A KYC update push written in Hindi, the top UPI-era scam pattern.');
+    }
+    if (/(बैंक|sbi|hdfc|icici|paytm|phonepe|upi)[^.।!?]{0,40}(बंद|वेरिफाई|अपडेट|लिंक|खत्म|ब्लॉक|निलंबित)/.test(lower)) {
+      hit(10, 'Hindi financial brand + action',
+        'A trusted money brand plus a Hindi action you are pushed to take.');
+    }
+    if (/(बिजली)[^.।!?]{0,40}(कट|बकाया|डिस्कनेक्ट)/.test(lower)) {
+      hit(20, 'Hindi electricity scam pattern',
+        'A fake power-cut warning written in Hindi.');
+    }
+    // Scam types that previously scored 0-35: digital arrest, fake
+    // police threats, upfront fees, guaranteed-profit investment bait,
+    // and blackmail / sextortion.
+    if (/(digital arrest|डिजिटल अरेस्ट)/.test(lower)) {
+      hit(30, 'Digital arrest scam',
+        'No police, CBI or ED officer arrests you over a video call or demands money to avoid arrest.');
+      if (/(pay|transfer|send money|bitcoin|video call)/.test(lower)) {
+        hit(20, 'Payment demanded under arrest threat',
+          'Demanding payment to avoid arrest is the digital-arrest lever.');
+      }
+    } else if (/((cbi|police|enforcement directorate|\bed\b)[^.]{0,40}(arrest|video call|money laundering)|(arrest|video call|money laundering)[^.]{0,40}(cbi|police|enforcement directorate|\bed\b))/.test(lower)) {
+      hit(25, 'Fake police / arrest threat',
+        'A law-enforcement threat used to force an urgent payment.');
+    }
+    if (/(registration fee|processing fee|delivery fee|advance fee)/.test(lower)) {
+      hit(20, 'Upfront fee request',
+        'Real jobs, loans and deliveries do not demand a fee up front to release money or a parcel.');
+    }
+    if (/(guaranteed profit|double your money|double.*money.*days|100% profit)/.test(lower)) {
+      // 30, not 25: a guaranteed-profit claim on its own reaches the
+      // suspicious band, like an OTP request does.
+      hit(30, 'Guaranteed-profit investment bait',
+        'No real investment guarantees profit or doubles money in days.');
+    }
+    if (/((private video|personal video)[^.]{0,40}(share|leak|publish|send to)|(share|leak|publish|send to)[^.]{0,40}(private video|personal video))/.test(lower)) {
+      hit(30, 'Blackmail / sextortion threat',
+        'Threatening to share a private video unless you pay is blackmail, not a real debt.');
     }
     if (/(electricity|bijli|power)[^.]{0,40}(disconnect|cut off|bill[^.]{0,20}(pending|due|unpaid)|payment[^.]{0,20}(pending|due))/.test(lower)) {
       hit(20, 'Electricity disconnection scam pattern',

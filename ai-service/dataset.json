@@ -423,5 +423,29 @@
     "input": "See our blog https://example.com/blog and docs https://example.org/docs for details.",
     "expect": ["safe"],
     "conf": ["high", "medium", "low"]
+  },
+  {
+    "id": "S15",
+    "category": "scam-lottery",
+    "language": "devanagari",
+    "input": "बधाई हो! आपने ₹5,00,000 की लॉटरी जीती है। इनाम प्राप्त करने के लिए तुरंत अपनी बैंक जानकारी और ओटीपी साझा करें।",
+    "expect": ["phishing"],
+    "conf": ["high", "medium"]
+  },
+  {
+    "id": "S16",
+    "category": "scam-kyc",
+    "language": "mixed",
+    "input": "आपका खाता बंद हो जाएगा, update your KYC now: http://sbi-kyc-update.xyz/verify",
+    "expect": ["phishing", "suspicious"],
+    "conf": ["high", "medium"]
+  },
+  {
+    "id": "G13",
+    "category": "legit-transaction",
+    "language": "devanagari",
+    "input": "आपके SBI खाते में ₹10,000 जमा हुए हैं। शेष राशि: ₹48,200।",
+    "expect": ["safe"],
+    "conf": ["high", "medium", "low"]
   }
 ]

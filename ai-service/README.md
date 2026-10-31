@@ -246,7 +246,7 @@ npm test
 
 Live checks (with a key configured) — the service must return valid JSON
 (or run the scripted bar: start the service with a key, then
-`node live-test.js` — 21 cases: cases 1-5 below, one Hinglish case, five
+`node live-test.js` — 25 cases: cases 1-5 below, one Hinglish case, five
 injection variants, plus legit transaction alerts, delivery
 notifications, payment reminders, electricity scams, Devanagari Hindi,
 mixed Hindi-English, multi-URL messages, brand mentions in warnings,
@@ -280,7 +280,7 @@ curl -X POST http://localhost:4000/ai/analyze \
 ## Labelled dataset (accuracy measurement, not a gate)
 
 Passing a small fixed test set does not establish real-world accuracy.
-`live-test.js` is the gating bar (21 cases, must all pass). `dataset.json`
+`live-test.js` is the gating bar (25 cases, must all pass). `dataset.json`
 + `dataset-test.js` measure accuracy over a larger labelled set instead:
 
 ```bash
@@ -289,7 +289,7 @@ node dataset-test.js
 # Optional gate: MIN_ACCURACY=0.8 node dataset-test.js
 ```
 
-- 53 cases across scam types (KYC, prize, electricity, delivery, job,
+- 56 cases across scam types (KYC, prize, electricity, delivery, job,
   lottery, APK, SIM, refund, bank impersonation), legitimate types (OTP,
   transactions, delivery, reminders, warnings, official links), languages
   (English, Hinglish, Punjabi Gurmukhi/Roman, Devanagari Hindi, mixed),

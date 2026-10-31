@@ -143,6 +143,18 @@ Implemented and demonstrated with tests + live Render checks:
 - Punjabi support: Gurmukhi script + Roman Punjabi message checks mirroring
   the English signals (urgency, block threat, prize, OTP request, KYC,
   financial brand, electricity), plus a Punjabi section in the AI prompt
+- Hindi support: Devanagari message checks mirroring the English signals
+  (urgency, block threat, prize, OTP / bank-info request with a do-not-share
+  negation guard, KYC, financial brand, electricity), plus a Devanagari
+  section in the AI prompt; cross-script pairs (Latin KYC + Devanagari
+  action and vice versa) are caught once, never double-counted
+- New scam types: digital-arrest threats (+30, +20 more when payment is
+  demanded), fake police / arrest threats (+25), upfront-fee requests
+  (+20), guaranteed-profit investment bait (+30), blackmail / sextortion
+  threats (+30); @ URLs now score 30 (suspicious on their own); the
+  English and Hindi OTP-request rules now skip negated warnings per match
+  ("do not share your OTP", "OTP मत बताएं") while still catching the
+  "share it with us" referral trick
 - SSRF pinning for redirect fetches: each hop resolves once and the
   connection is pinned to a validated address (no second DNS lookup, so
   DNS rebinding cannot steer a fetch to a private host); hostname still
