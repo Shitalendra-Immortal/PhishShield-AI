@@ -21,7 +21,7 @@ key. Inputs are analyzed in memory and never stored.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | Liveness check: `{ status: "ok", ... }` |
-| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note?, redirectChain?, finalUrl?, threatIntel?, ai? }`. URL mode only: shortener links get redirect-chain analysis, non-official URLs get a URLhaus lookup (see contract). Every valid scan gets an AI second opinion in `ai` when `AI_SERVICE_URL` is set. Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. Rate-limited: 100 requests per 15 minutes per IP (429 `RATE_LIMITED`). |
+| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note?, redirectChain?, finalUrl?, threatIntel?, ai?, assessment }`. URL mode only: shortener links get redirect-chain analysis, non-official URLs get a URLhaus lookup (see contract). Every valid scan gets an AI second opinion in `ai` when `AI_SERVICE_URL` is set. Every valid scan also carries `assessment` (see contract): the headline `finalVerdict` is the highest JUSTIFIED severity across backend + AI; top-level `score`/`verdict` stay the backend result. Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. Rate-limited: 100 requests per 15 minutes per IP (429 `RATE_LIMITED`). |
 | GET | `/api/samples` | Demo samples for the frontend's "Try a sample" chips. |
 
 Errors are always `{ error: { code, message } }`: `MISSING_INPUT` (400),
@@ -143,6 +143,44 @@ Implemented and demonstrated with tests + live Render checks:
 - Punjabi support: Gurmukhi script + Roman Punjabi message checks mirroring
   the English signals (urgency, block threat, prize, OTP request, KYC,
   financial brand, electricity), plus a Punjabi section in the AI prompt
+- Hindi support: Devanagari message checks mirroring the English signals
+  (urgency, block threat, prize, OTP / bank-info request with a do-not-share
+  negation guard, KYC, financial brand, electricity), plus a Devanagari
+  section in the AI prompt; cross-script pairs (Latin KYC + Devanagari
+  action and vice versa) are caught once, never double-counted
+- New scam types: digital-arrest threats (+30, +20 more when payment is
+  demanded), fake police / arrest threats (+25), upfront-fee requests
+  (+20), guaranteed-profit investment bait (+30), blackmail / sextortion
+  threats (+30); @ URLs now score 30 (suspicious on their own); the
+  English and Hindi OTP-request rules now skip negated warnings per match
+  ("do not share your OTP", "OTP मत बताएं") while still catching the
+  "share it with us" referral trick
+- Fake-testimonial reward lure (+30): a first-person money-received claim
+  ("mil gaye", "got", "received") plus an urge for others to try it
+  ("tum log bhi try karo", "you guys try") plus a link — the
+  referral-scam shape; bank alerts (no urge, no link) and link-less
+  claims do not fire
+- P0 audit fixes: ID-document request rule (+30, Aadhaar/PAN/bank/card
+  details + share/send/provide/submit/enter/give, with negation guard;
+  "tell" and "about" phrasings excluded); KYC completion guards
+  (English "is complete/completed", Hindi/Punjabi complete + done
+  marker) so receipts no longer read suspicious; brand + action rule
+  ignores "update you/us/me" status notifications; customs +
+  clearance fees join the upfront-fee list; profit bait covers
+  "double your bitcoin/btc/crypto"
+- Brand matching is token-based, not substring: a brand fires only
+  when it IS a host token or STARTS one (dot labels, then hyphen
+  tokens, after leetspeak normalisation). Substring matching fired
+  inside unrelated words ("upi" in "stupid"/"cupinfo"/"ubuntupit",
+  "sbi" in "massbio"/"ridethisbike", "apple" in "thebigapplegirl")
+  — the combined evaluation's biggest false-positive source.
+  Official domains extended with airtel.in, airtelxstream.in, jio.com
+  and amazonaws.cn (AWS China); pnb.com.ph deliberately left flagged
+  as an abbreviation collision (Philippine vs Punjab National Bank).
+  Bare-link extraction fixed in the same change: it truncated
+  multi-label domains to two labels ("i.airtel.in/2gb_rc2" became
+  "i.airtel"), so message-mode checks ran on a wrong host; it now
+  captures all labels and still ignores email addresses
 - SSRF pinning for redirect fetches: each hop resolves once and the
   connection is pinned to a validated address (no second DNS lookup, so
   DNS rebinding cannot steer a fetch to a private host); hostname still
@@ -158,6 +196,17 @@ Implemented and demonstrated with tests + live Render checks:
   assessment/confidence backed by at least one signal
 - AI second-opinion wiring (every valid scan, additive
   `ai` field, engine verdict never changed) — code + mock tests done
+- Dual-verdict aggregation (`backend/assessment.js`, pure function): every
+  response carries `assessment` { finalVerdict, backendVerdict, aiVerdict,
+  disagreement, aiJustified, combinedEvidence, recommendation }. The final
+  verdict is the highest JUSTIFIED severity (safe < suspicious <
+  phishing), never a naive max and never a score comparison: the backend
+  verdict always counts, an AI verdict above it counts only with >= 1
+  signal and medium/high confidence; a low-confidence or signal-less AI
+  claim is recorded (aiVerdict, disagreement, evidence) but does not move
+  the headline. Top-level score/verdict/reasons/ai are unchanged. The AI
+  now judges the POST-enrichment engine snapshot in URL mode (review
+  item 3, option B, decided with this change)
 
 Still pending (deployment/coordination steps, not code gaps):
 - AI service deployed 2026-10-31 (Render, `ai-service/` root) and backend
@@ -170,6 +219,9 @@ Still pending (deployment/coordination steps, not code gaps):
   the `ai` card with agreement/disagreement display (verified in Frontend2.0)
 - Labelled dataset + precision/recall/F1 (Member 4's deferred corpus work)
 - Frontend rendering of the `ai` second-opinion panel (Member 1)
+- Frontend final-verdict display (Member 1): the Result page headline
+  becomes `assessment.finalVerdict` with the engine + AI breakdown kept
+  inspectable (spec: `goals/graviton-2026-phishshield-ai-build/files/phishshield-aggregator-frontend-handoff.md`); backend + contract are done, display is pending
 - Live 429 demonstration from a single fixed IP (this VM's egress IPs rotate,
   so the loop never tripped the limiter; local rate-limit tests pass 9/9)
 

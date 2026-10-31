@@ -11,6 +11,7 @@ const { createRateLimiter } = require('./rateLimit.js');
 const { followRedirects } = require('./redirect.js');
 const { lookupUrlhaus } = require('./urlhaus.js');
 const { getAiOpinion } = require('./ai.js');
+const { aggregateAssessment } = require('./assessment.js');
 
 const PORT = process.env.PORT || 3000;
 const MAX_INPUT = 5000;
@@ -148,15 +149,6 @@ app.post('/api/analyze', async (req, res) => {
     }
   }
 
-  // Snapshot of the ENGINE result (pre-enrichment), sent as context to
-  // the AI second opinion, per AI_SERVICE_CONTRACT.md.
-  const engineSnapshot = {
-    kind: result.kind,
-    score: result.score,
-    verdict: result.verdict,
-    reasons: result.reasons.slice()
-  };
-
   // URL-mode enrichment (additive only; never breaks the base verdict).
   // Message mode gets no enrichment: short links inside messages are
   // already capped at 40 points by the engine.
@@ -214,16 +206,41 @@ app.post('/api/analyze', async (req, res) => {
       }
     }
   }
-  // AI second opinion (additive only): every valid scan, and only when
-  // AI_SERVICE_URL is set. Never changes score/verdict; on any failure
-  // the field is simply omitted.
+  // AI second opinion: every valid scan, and only when AI_SERVICE_URL
+  // is set. The AI judges the POST-enrichment engine snapshot (review
+  // item 3, option B, decided with the dual-verdict aggregator: since
+  // the AI assessment now shapes the final verdict, it must see the
+  // final engine state, not the pre-enrichment one). Message mode has
+  // no enrichment, so its snapshot is unchanged by this. The AI never
+  // changes score/verdict (the backend result); on any failure the
+  // field is simply omitted.
   if (process.env.AI_SERVICE_URL) {
     try {
+      const engineSnapshot = {
+        kind: result.kind,
+        score: result.score,
+        verdict: result.verdict,
+        reasons: result.reasons.slice()
+      };
       const opinion = await getAiOpinion(input, engineSnapshot);
       if (opinion) result.ai = opinion;
     } catch (e) {
       // AI is never on the critical path.
     }
+  }
+  // Dual-verdict aggregation (additive): top-level score/verdict stay
+  // the backend result; assessment.finalVerdict is the highest
+  // JUSTIFIED severity (see assessment.js — a low-confidence or
+  // signal-less AI claim is recorded, not promoted). Any aggregator
+  // failure degrades to no assessment field rather than breaking the
+  // scan.
+  try {
+    result.assessment = aggregateAssessment(
+      { verdict: result.verdict, reasons: result.reasons },
+      result.ai || null
+    );
+  } catch (e) {
+    // Assessment is never on the critical path.
   }
   res.locals.log = {
     level: result.verdict.level,

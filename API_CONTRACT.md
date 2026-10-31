@@ -114,7 +114,8 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
 | `redirectChain` | string[] | URL mode only: every URL actually fetched while following a redirect chain, input first. `[]` when no redirect was followed (including when following was skipped or failed). |
 | `finalUrl` | string or null | URL mode only: the last fetched URL in the chain, or `null` when nothing was fetched. |
 | `threatIntel` | object | URL mode only: `{ status, threat }` where `status` is `"listed"` (URL appears in abuse.ch URLhaus), `"clean"` (checked, not listed), or `"unknown"` (lookup failed, skipped, or disabled); `threat` is the URLhaus threat type (e.g. `"malware_download"`) or `null`. |
-| `ai` | object (optional) | Present only when an AI second opinion was obtained: `AI_SERVICE_URL` is configured on the backend AND the AI service answered with `available: true`. The backend asks for every valid scan, regardless of score. Shape: `{ available: true, assessment, confidence, signals: [{ type, detail }], explanation, recommendedAction }` (see the AI service contract). It never changes `score` or `verdict`; when absent, show the engine verdict alone. |
+| `ai` | object (optional) | Present only when an AI second opinion was obtained: `AI_SERVICE_URL` is configured on the backend AND the AI service answered with `available: true`. The backend asks for every valid scan, regardless of score. Shape: `{ available: true, assessment, confidence, signals: [{ type, detail }], explanation, recommendedAction }` (see the AI service contract). It never changes `score` or `verdict` (the backend result); its `assessment` feeds `assessment.finalVerdict` (below) when justified. When absent, `assessment.aiVerdict` is `null` and the final verdict equals the backend verdict. |
+| `assessment` | object | Always present on a successful `/api/analyze` response. `{ finalVerdict, backendVerdict, aiVerdict, disagreement, aiJustified, combinedEvidence, recommendation }`. `finalVerdict` is the headline: the highest JUSTIFIED severity (safe < suspicious < phishing) across the two systems, by category — never by raw score, never a naive max. The backend verdict always counts; an AI verdict above the backend counts only when justified (at least one signal AND confidence medium or high). A low-confidence or signal-less AI claim is recorded, not promoted — that is the false-positive guard. `backendVerdict` is `verdict.level`; `aiVerdict` is `ai.assessment`, or `null` when no valid AI opinion was obtained (never `"safe"` for an error). `disagreement` is true only when both are present and differ (including when an AI escalation was not justified). `aiJustified` reports whether the AI opinion meets the escalation bar; it is only meaningful when `aiVerdict` exceeds `backendVerdict`. `combinedEvidence` is the engine `reasons` tagged `source: "engine"` followed by the AI `signals` tagged `source: "ai"` — findings are listed once per system, never merged, and there is no combined score. `recommendation` is the engine advice for the final band, plus the AI `recommendedAction` when the AI justifiably escalated. Top-level `score`/`verdict`/`reasons`/`ai` are unchanged (backward compatible). |
 
 **Verdict bands (fixed in v1 — do not change without a contract update)**
 
@@ -157,12 +158,12 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
 - **Sender check (engine):** message mode now flags `"Brand"
   <address@other-domain>` sender-name impersonation (+30 points, Suspicious
   boundary on its own). A brand sender from its official domain is not flagged.
-- **AI second opinion (backend-only, additive):** for every valid scan, when
+- **AI second opinion + dual-verdict aggregation (backend-only):** for every valid scan, when
   `AI_SERVICE_URL` is set, the backend asks Member 3's
-  AI service for a second opinion (8 second timeout). On success the response
+  AI service for a second opinion (8 second timeout), giving it the POST-enrichment engine snapshot in URL mode (message mode has no enrichment; review item 3, option B, decided with the aggregator). On success the response
   gains an `ai` field (assessment, confidence, signals, explanation,
-  recommended action); on any failure the field is omitted and the engine
-  verdict stands alone. The AI never changes `score` or `verdict.level`.
+  recommended action); on any failure the field is omitted and the final
+  verdict equals the engine verdict. The AI never changes `score` or `verdict.level` (the backend result); it shapes only `assessment.finalVerdict`, and only when justified (see the `assessment` row).
 
 **More real examples (engine output, for frontend test fixtures)**
 
