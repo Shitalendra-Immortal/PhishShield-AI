@@ -5,7 +5,6 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  ExternalLink,
   Info,
   Lightbulb,
   Route,
@@ -30,7 +29,7 @@ const MARK_STYLE: Record<Severity, string> = {
   info: "bg-interactive text-cream",
   low: "bg-peach/15 text-peach decoration-peach/50",
   medium: "bg-warn/15 text-warn decoration-warn/50",
-  high: "bg-danger/20 text-[#FF9B88] decoration-danger/60",
+  high: "bg-danger/20 text-danger font-semibold decoration-danger/60",
 };
 
 const AI_SIGNAL_TITLES: Record<string, string> = {
@@ -271,7 +270,7 @@ export function Result({
   const hasLegacyFindings = scan.findings && scan.findings.length > 0;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 animate-rise">
+    <div className="mx-auto w-full max-w-5xl space-y-3.5 sm:space-y-4 animate-rise">
       {/* Top action header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
@@ -295,7 +294,7 @@ export function Result({
       </div>
 
       {/* Main Verdict Card: 16px radius, solid tonal surface */}
-      <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface p-6 sm:p-8 lg:p-9">
+      <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface p-6 sm:p-7 lg:p-8">
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl">
             <div className="flex flex-wrap items-center gap-2.5 mb-3.5 sm:mb-4">
@@ -335,7 +334,7 @@ export function Result({
             {scan.threatIntel && (
               <div className="mt-3">
                 {scan.threatIntel.status === "listed" && (
-                  <div className="flex items-center gap-2.5 rounded-[10px] border border-danger/35 bg-danger/12 px-4 py-2.5 font-sans text-[0.88rem] text-[#FFB0A0]">
+                  <div className="flex items-center gap-2.5 rounded-[10px] border border-danger/45 bg-danger/15 px-4 py-2.5 font-sans text-[0.88rem] text-danger font-semibold">
                     <ShieldAlert className="h-4 w-4 shrink-0 text-danger" />
                     <span>
                       <strong className="text-cream">URLhaus Alert:</strong> Listed in malicious URL database
@@ -368,9 +367,6 @@ export function Result({
               <p className="font-sans text-[0.8rem] font-semibold uppercase tracking-[0.16em] text-muted">
                 Risk Score
               </p>
-              <p className={cn("font-mono text-[0.84rem] font-semibold tracking-wide", style.text)}>
-                {style.label}
-              </p>
             </div>
 
             <div className="mt-2 flex items-baseline gap-2">
@@ -390,17 +386,20 @@ export function Result({
               />
             </div>
 
-            {/* Scale with High Contrast */}
-            <div className="mt-3 grid grid-cols-3 text-center font-mono text-[0.76rem] font-medium">
-              <span className={cn(scan.score < 30 ? "text-safe font-bold" : "text-safe/80")}>
-                Safe (0–29)
-              </span>
-              <span className={cn(scan.score >= 30 && scan.score < 60 ? "text-warn font-bold" : "text-warn/80")}>
-                Suspicious (30–59)
-              </span>
-              <span className={cn(scan.score >= 60 ? "text-danger font-bold" : "text-danger/80")}>
-                Phishing (60–100)
-              </span>
+            {/* Scale with Spectrum Values Below Text */}
+            <div className="mt-3 grid grid-cols-3 text-center font-mono text-[0.76rem]">
+              <div className={cn("flex flex-col items-center leading-tight", scan.score < 30 ? "text-safe font-bold" : "text-safe/80 font-medium")}>
+                <span>Safe</span>
+                <span className="text-[0.7rem] opacity-90 font-mono">(0–29)</span>
+              </div>
+              <div className={cn("flex flex-col items-center leading-tight", scan.score >= 30 && scan.score < 60 ? "text-warn font-bold" : "text-warn/80 font-medium")}>
+                <span>Suspicious</span>
+                <span className="text-[0.7rem] opacity-90 font-mono">(30–59)</span>
+              </div>
+              <div className={cn("flex flex-col items-center leading-tight", scan.score >= 60 ? "text-danger font-bold" : "text-danger/80 font-medium")}>
+                <span>Phishing</span>
+                <span className="text-[0.7rem] opacity-90 font-mono">(60–100)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -446,8 +445,8 @@ export function Result({
 
       {/* AI Second Opinion: Shown only when ai exists and ai.available is true */}
       {ai && ai.available && (
-        <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface animate-rise">
-          <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-line-soft sm:px-8">
+        <section className="relative overflow-hidden rounded-[16px] border border-line bg-gradient-to-br from-elevated/50 via-surface to-elevated/30 animate-rise">
+          <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5 border-b border-line-soft sm:px-8 bg-elevated/30">
             <div className="flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-flame/10 text-flame">
                 <Sparkles className="h-4 w-4" />
@@ -462,12 +461,18 @@ export function Result({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {aiComparison?.agrees && (
+                <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-safe/15 border border-safe/35 px-2.5 py-0.5 font-mono text-[0.74rem] font-medium text-safe">
+                  <CheckCircle2 className="h-3 w-3 text-safe" />
+                  Agrees with engine
+                </span>
+              )}
               {ai.assessment && (
                 <span
                   className={cn(
-                    "rounded-[6px] px-2.5 py-0.5 font-mono text-[0.74rem] font-semibold uppercase tracking-wider border",
-                    ai.assessment === "phishing" && "bg-danger/15 text-[#FFB0A0] border-danger/35",
+                    "rounded-[6px] px-2.5 py-0.5 font-mono text-[0.74rem] font-bold uppercase tracking-wider border",
+                    ai.assessment === "phishing" && "bg-danger/15 text-danger border-danger/45",
                     ai.assessment === "suspicious" && "bg-warn/15 text-warn border-warn/35",
                     ai.assessment === "safe" && "bg-safe/15 text-safe border-safe/35",
                   )}
@@ -483,68 +488,40 @@ export function Result({
             </div>
           </header>
 
-          <div className="p-6 sm:p-8 space-y-4">
+          <div className="p-4.5 sm:p-6 space-y-3">
             {ai.explanation && (
-              <div>
-                <p className="font-sans text-[0.78rem] font-semibold uppercase tracking-[0.14em] text-muted">
-                  Explanation
-                </p>
-                <p className="mt-1 font-sans text-[0.94rem] leading-relaxed text-cream/90">
-                  {ai.explanation}
-                </p>
-              </div>
+              <p className="font-sans text-[0.92rem] leading-relaxed text-cream/90">
+                {ai.explanation}
+              </p>
             )}
 
             {ai.signals && ai.signals.length > 0 && (
               <div className="pt-1">
-                <p className="font-sans text-[0.78rem] font-semibold uppercase tracking-[0.14em] text-muted">
+                <p className="font-sans text-[0.74rem] font-semibold uppercase tracking-[0.14em] text-muted">
                   Detected Signals ({ai.signals.length})
                 </p>
-                <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {ai.signals.map((sig, i) => (
                     <div
                       key={i}
-                      className="rounded-[10px] border border-line-soft bg-elevated p-3 text-[0.88rem]"
+                      className="rounded-[8px] border border-line-soft bg-elevated px-3 py-2 text-[0.84rem]"
                     >
-                      <p className="font-display font-semibold text-flame text-[0.92rem]">
+                      <p className="font-display font-semibold text-danger text-[0.88rem]">
                         {AI_SIGNAL_TITLES[sig.type] || sig.type.replace(/_/g, " ")}
                       </p>
-                      <p className="mt-1 font-sans text-[0.84rem] text-muted leading-relaxed">{sig.detail}</p>
+                      <p className="mt-0.5 font-sans text-[0.82rem] text-muted leading-relaxed">{sig.detail}</p>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {ai.recommendedAction && (
-              <div className="pt-2 border-t border-line-soft">
-                <p className="font-sans text-[0.78rem] font-semibold uppercase tracking-[0.14em] text-muted">
-                  Recommended Action
-                </p>
-                <p className="mt-1 font-sans text-[0.92rem] font-medium text-cream">
-                  {ai.recommendedAction}
-                </p>
               </div>
             )}
           </div>
         </section>
       )}
 
-      {/* Why Do the Assessments Differ? / Agreement Indicator */}
-      {ai && ai.available && aiComparison && (
-        aiComparison.agrees ? (
-          <div className="flex items-center gap-2.5 rounded-[12px] border border-safe/30 bg-safe/10 px-4.5 py-3 text-cream animate-fade">
-            <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-safe" />
-            <p className="font-sans text-[0.86rem] leading-relaxed">
-              <strong className="text-safe font-semibold">Both assessments agree: </strong>
-              <span className="text-cream/90">
-                The primary engine and the AI second opinion both classified this content as{" "}
-                <span className="font-semibold capitalize text-cream">{aiComparison.normBackend}</span>.
-              </span>
-            </p>
-          </div>
-        ) : (
-          <section className="relative overflow-hidden rounded-[16px] border border-warn/35 bg-warn/10 p-5 sm:p-6 animate-rise">
+      {/* Why Do the Assessments Differ? Notice (only shown when assessments diverge) */}
+      {ai && ai.available && aiComparison && !aiComparison.agrees && (
+        <section className="relative overflow-hidden rounded-[16px] border border-warn/35 bg-warn/10 p-5 sm:p-6 animate-rise">
             <div className="flex items-start gap-3.5">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-warn/20 text-warn">
                 <AlertTriangle className="h-4.5 w-4.5" />
@@ -588,16 +565,15 @@ export function Result({
               </div>
             </div>
           </section>
-        )
       )}
 
       {/* What We Detected (Signals & Indicators): 16px radius card */}
       <section className="overflow-hidden rounded-[16px] border border-line bg-surface">
-        <header className="flex items-baseline justify-between gap-4 px-6 py-4 border-b border-line-soft sm:px-8">
-          <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
+        <header className="flex items-baseline justify-between gap-4 px-6 py-3 border-b border-line-soft sm:px-8">
+          <h2 className="font-display text-[1.08rem] font-semibold tracking-[-0.02em] text-cream">
             What we detected
           </h2>
-          <span className="font-mono text-[0.82rem] font-medium text-muted">
+          <span className="font-mono text-[0.8rem] font-medium text-muted">
             {hasReasons
               ? `${scan.reasons.length} signal${scan.reasons.length === 1 ? "" : "s"}`
               : hasLegacyFindings
@@ -607,12 +583,12 @@ export function Result({
         </header>
 
         {!hasReasons && !hasLegacyFindings ? (
-          <p className="border-t border-line-soft px-6 py-8 font-sans text-[0.94rem] leading-relaxed text-muted sm:px-8">
-            No phishing signals found. While this content shows no recognized threats, always verify
-            sensitive financial requests or password prompts directly with the provider.
-          </p>
+          <div className="border-t border-line-soft px-6 py-3.5 sm:px-8 flex items-center gap-2.5 text-muted font-sans text-[0.88rem]">
+            <CheckCircle2 className="h-4 w-4 text-safe shrink-0" />
+            <span>No threat signals detected. Checks completed cleanly.</span>
+          </div>
         ) : (
-          <ul className="border-t border-line-soft">
+          <ul className="border-t border-line-soft divide-y divide-line-soft">
             {hasReasons
               ? scan.reasons.map((r, i) => {
                   const isPositive = r.points > 0;
@@ -622,13 +598,13 @@ export function Result({
                   return (
                     <li
                       key={i}
-                      className="flex items-start justify-between gap-4 border-b border-line-soft px-6 py-4 last:border-b-0 hover:bg-interactive/30 transition-colors sm:px-8"
+                      className="flex items-start justify-between gap-4 px-6 py-3.5 hover:bg-interactive/30 transition-colors sm:px-8"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-display text-[0.98rem] font-semibold tracking-[-0.015em] text-cream">
+                        <p className="font-display text-[0.95rem] font-semibold tracking-[-0.015em] text-cream">
                           {r.label}
                         </p>
-                        <p className="mt-1 font-sans text-[0.9rem] leading-relaxed text-muted">
+                        <p className="mt-0.5 font-sans text-[0.86rem] leading-relaxed text-muted">
                           {r.detail}
                         </p>
                       </div>
@@ -636,8 +612,8 @@ export function Result({
                       {/* Points badge: 6px radius, IBM Plex Mono */}
                       <span
                         className={cn(
-                          "shrink-0 font-mono text-[0.8rem] font-medium px-2.5 py-0.5 rounded-[6px] border",
-                          isPositive && "bg-danger/15 text-[#FFB0A0] border-danger/35",
+                          "shrink-0 font-mono text-[0.78rem] font-medium px-2 py-0.5 rounded-[6px] border",
+                          isPositive && "bg-danger/20 text-danger border-danger/50 font-bold",
                           isNegative && "bg-safe/15 text-safe border-safe/35",
                           isZero && "bg-interactive text-muted border-line",
                         )}
@@ -650,13 +626,13 @@ export function Result({
               : scan.findings!.map((f) => (
                   <li
                     key={f.id}
-                    className="flex gap-4 border-b border-line-soft px-6 py-4 last:border-b-0 hover:bg-interactive/30 transition-colors sm:px-8"
+                    className="flex gap-4 px-6 py-3.5 hover:bg-interactive/30 transition-colors sm:px-8"
                   >
                     <div className="min-w-0">
-                      <p className="font-display text-[0.98rem] font-semibold tracking-[-0.015em] text-cream">
+                      <p className="font-display text-[0.95rem] font-semibold tracking-[-0.015em] text-cream">
                         {f.title}
                       </p>
-                      <p className="mt-1 font-sans text-[0.9rem] leading-relaxed text-muted">{f.detail}</p>
+                      <p className="mt-0.5 font-sans text-[0.86rem] leading-relaxed text-muted">{f.detail}</p>
                     </div>
                   </li>
                 ))}
@@ -664,76 +640,64 @@ export function Result({
         )}
       </section>
 
-      {/* Recommended Action: 16px radius card with dedicated accent shade */}
-      <section className="relative overflow-hidden rounded-[16px] border border-line-soft border-l-[4px] border-r-[4px] border-l-flame border-r-flame bg-gradient-to-br from-elevated/70 via-surface to-elevated/40 shadow-sm">
-        <header className="flex items-center gap-2.5 px-6 py-4 border-b border-line-soft sm:px-8 bg-surface/50">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-flame/12 text-flame">
-            <Lightbulb className="h-3.5 w-3.5" />
+      {/* Recommended Action */}
+      <section className="relative overflow-hidden rounded-[16px] border border-flame/40 bg-gradient-to-br from-flame/[0.04] via-surface to-ember/[0.02] dark:from-flame/[0.06] dark:via-surface dark:to-transparent">
+        <header className="flex items-center gap-2 px-6 py-3 border-b border-flame/15 sm:px-8 bg-flame/[0.03]">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-flame/12 text-flame">
+            <Lightbulb className="h-3 w-3" />
           </span>
-          <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
+          <h2 className="font-display text-[1.05rem] font-semibold tracking-[-0.02em] text-cream">
             Recommended Action
           </h2>
         </header>
-        <div className="px-6 py-5 sm:px-8">
-          <p className="font-sans text-[0.98rem] leading-relaxed text-cream font-medium">
+        <div className="px-6 py-3.5 sm:px-8">
+          <p className="font-sans text-[0.94rem] leading-relaxed text-cream font-medium">
             {scan.advice || "No specific action required. Continue to follow standard security practices."}
           </p>
         </div>
       </section>
 
-      {/* Submitted Content Display: 16px radius card */}
+      {/* Submitted Content Display */}
       <section className="overflow-hidden rounded-[16px] border border-line bg-surface">
-        <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-line-soft sm:px-8">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
-              Submitted Content
-            </h2>
-            <span className="font-mono text-[0.78rem] text-muted">
-              {scan.input.length} characters
-            </span>
-          </div>
+        <header className="flex items-center justify-between px-6 py-2.5 border-b border-line-soft sm:px-8">
+          <h2 className="font-display text-[1.02rem] font-semibold text-cream">
+            Submitted Content
+          </h2>
 
-          <div className="flex items-center gap-2">
-            {scan.type === "url" && (
-              <span className="font-sans text-[0.8rem] text-muted flex items-center gap-1">
-                <ExternalLink className="h-3 w-3" /> Exact URL inspected
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={copyInputText}
-              className="inline-flex items-center gap-1 rounded-[8px] border border-line bg-elevated px-3 py-1 font-sans text-[0.78rem] text-muted transition-colors hover:text-cream hover:bg-interactive focus-visible:focus-ring"
-            >
-              {copiedInput ? <Check className="h-3 w-3 text-safe" /> : <Copy className="h-3 w-3" />}
-              {copiedInput ? "Copied" : "Copy Content"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={copyInputText}
+            className="inline-flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 font-sans text-[0.78rem] text-muted hover:text-cream hover:bg-interactive transition-colors"
+          >
+            {copiedInput ? <Check className="h-3.5 w-3.5 text-safe" /> : <Copy className="h-3.5 w-3.5" />}
+            <span>{copiedInput ? "Copied" : "Copy"}</span>
+          </button>
         </header>
 
-        <div className="px-6 py-5 sm:px-8">
+        <div className="px-6 py-3.5 sm:px-8">
           <div
             className={cn(
-              "max-h-[22rem] overflow-y-auto whitespace-pre-wrap break-words break-all rounded-[10px] border border-line-soft bg-elevated p-4 leading-[1.8] text-cream",
-              scan.type === "url" ? "font-mono text-[0.92rem]" : "font-sans text-[0.94rem]",
+              "max-h-[16rem] overflow-y-auto whitespace-pre-wrap break-words rounded-[8px] bg-elevated/70 p-3 leading-relaxed text-cream/90 select-text",
+              scan.type === "url" ? "font-mono text-[0.88rem]" : "font-sans text-[0.9rem]",
             )}
           >
             {evidence}
           </div>
 
-          {scan.urls && scan.urls.length > 0 && (
-            <div className="mt-5">
-              <p className="font-sans text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-muted">
-                Links found in content ({scan.urls.length})
+          {scan.urls && scan.urls.length > 0 && scan.type !== "url" && (
+            <div className="mt-4">
+              <p className="font-sans text-[0.76rem] font-semibold uppercase tracking-[0.14em] text-muted">
+                Links found ({scan.urls.length})
               </p>
-              <ul className="mt-2.5 space-y-2 font-mono text-[0.86rem]">
+              <ul className="mt-2 space-y-1.5 font-mono text-[0.82rem]">
                 {scan.urls.map((u, i) => {
                   const urlText = typeof u === "string" ? u : (u as { raw: string }).raw;
                   return (
                     <li
                       key={i}
-                      className="flex items-center justify-between gap-3 rounded-[10px] border border-line-soft bg-elevated px-3.5 py-2.5 break-all"
+                      className="rounded-[6px] bg-elevated/70 px-3 py-2 text-cream/90 break-all"
                     >
-                      <span className="truncate text-cream/90">{urlText}</span>
+                      {urlText}
                     </li>
                   );
                 })}

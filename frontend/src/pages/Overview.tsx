@@ -83,7 +83,7 @@ function TypewriterWord() {
             className="pointer-events-none flex items-center justify-center select-none"
           >
             <svg
-              className="relative h-[20rem] w-[20rem] xl:h-[23rem] xl:w-[23rem] select-none text-cream"
+              className="relative h-[22rem] w-[22rem] lg:h-[26rem] lg:w-[26rem] xl:h-[30rem] xl:w-[30rem] select-none text-cream"
               viewBox="0 0 360 360"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -179,11 +179,11 @@ function TypewriterWord() {
 
           function Stat({value, label}: {value: number; label: string }) {
   return (
-          <div className="px-6 py-5 sm:px-8 sm:py-6">
-            <p className="font-mono text-[2.2rem] font-semibold leading-none tracking-tight text-cream tabular-nums sm:text-[2.6rem]">
+          <div className="px-6 py-6 sm:px-8 sm:py-7 lg:px-10 lg:py-8">
+            <p className="font-mono text-[2.4rem] font-semibold leading-none tracking-tight text-cream tabular-nums sm:text-[3rem] lg:text-[3.4rem]">
               {value}
             </p>
-            <p className="mt-2 font-sans text-[0.84rem] font-medium text-muted">{label}</p>
+            <p className="mt-2.5 font-sans text-[0.88rem] font-medium text-muted sm:text-[0.94rem]">{label}</p>
           </div>
           );
 }
@@ -205,33 +205,30 @@ function TypewriterWord() {
           const recent = history.slice(0, 5);
 
           return (
-          <div className="space-y-6">
+          <div className="space-y-8 sm:space-y-10">
             {/* Hero Section: 20px radius hero container, solid tonal surface */}
             <section className="relative overflow-hidden rounded-[20px] border border-line bg-surface animate-rise">
-              <div className="grid grid-cols-1 items-center gap-8 px-6 py-10 sm:px-10 sm:py-12 lg:grid-cols-12 lg:gap-8 lg:px-12 lg:py-14">
+              <div className="grid grid-cols-1 items-center gap-10 px-8 py-14 sm:px-12 sm:py-18 lg:grid-cols-12 lg:gap-12 lg:px-16 lg:py-24 xl:py-28">
                 <div className="flex flex-col justify-center lg:col-span-7 xl:col-span-7 z-10">
-                    <h1 className="font-display text-[2.2rem] font-semibold leading-[1.14] tracking-[-0.03em] text-cream sm:text-[2.8rem] lg:text-[3.2rem]">
-                      Stay ahead of
-                      <br />
-                      <span className="inline-flex items-baseline whitespace-nowrap">
-                        <span className="text-gradient mr-[0.26em]">digital</span>
-                        <TypewriterWord />
-                      </span>
-                    </h1>
-                    <p className="mt-4 max-w-xl font-sans text-[0.98rem] leading-[1.7] text-muted sm:text-[1.05rem]">
-                      Analyse suspicious messages, emails and links before you interact with them.
-                    </p>
-                    <div className="mt-8 flex flex-wrap items-center gap-3">
-                      <LiquidButton size="lg" onClick={() => onNavigate("scan")}>
-                        Start a Scan
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </LiquidButton>
-                    </div>
-
-                    <div className="mt-8 max-w-xl border-t border-line-soft pt-4 font-sans text-[0.82rem] leading-relaxed text-muted">
-                      Language signals · Link forensics · Threat intelligence —{" "}
-                      <span className="text-cream font-medium">processed in memory via PhishShield API.</span>
-                    </div>
+                  <h1 className="font-display text-[2.6rem] font-semibold leading-[1.12] tracking-[-0.035em] text-cream sm:text-[3.4rem] lg:text-[4rem] xl:text-[4.4rem]">
+                    Stay ahead of
+                    <br />
+                    <span className="inline-flex items-baseline whitespace-nowrap">
+                      <span className="text-gradient mr-[0.26em]">digital</span>
+                      <TypewriterWord />
+                    </span>
+                  </h1>
+                  <p className="mt-5 max-w-xl font-sans text-[1.04rem] leading-[1.7] text-muted sm:text-[1.16rem] lg:text-[1.24rem] text-balance">
+                    Analyse suspicious messages, emails and links
+                    <br className="hidden sm:inline" />
+                    {" "}before you interact with them.
+                  </p>
+                  <div className="mt-9 flex flex-wrap items-center gap-3">
+                    <LiquidButton size="lg" onClick={() => onNavigate("scan")}>
+                      Start a Scan
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </LiquidButton>
+                  </div>
                 </div>
 
                 <div className="hidden lg:flex lg:col-span-5 xl:col-span-5 items-center justify-center">

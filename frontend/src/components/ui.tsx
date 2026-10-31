@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Button as AnimateButton } from "@animate-ui/react/primitives/buttons/button";
 import type { RiskLevel, ScanType, Severity } from "../types";
 import { cn } from "../utils/cn";
 import { ThreatIcon } from "./ThreatIcon";
@@ -63,21 +64,23 @@ export function Button({
   ...rest
 }: ButtonProps) {
   return (
-    <button
-      {...rest}
-      className={cn(
-        "relative inline-flex items-center justify-center gap-2 rounded-[12px] font-sans font-medium outline-none transition-all duration-200 focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-40",
-        size === "lg" ? "px-5 py-2.5 text-[0.92rem]" : "px-4 py-2 text-[0.85rem]",
-        variant === "primary" &&
-          "bg-flame-gradient font-semibold text-[#1B1011] shadow-sm hover:brightness-[1.05] active:scale-[0.985]",
-        variant === "ghost" &&
-          "border border-line bg-elevated text-cream hover:bg-interactive hover:border-line",
-        variant === "quiet" && "text-muted hover:text-cream hover:bg-interactive/50",
-        className,
-      )}
-    >
-      {children}
-    </button>
+    <AnimateButton asChild>
+      <button
+        {...rest}
+        className={cn(
+          "relative inline-flex items-center justify-center gap-2 rounded-[12px] font-sans font-medium outline-none cursor-pointer transition-colors duration-200 focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-40",
+          size === "lg" ? "px-5 py-2.5 text-[0.92rem]" : "px-4 py-2 text-[0.85rem]",
+          variant === "primary" &&
+            "bg-flame-gradient font-semibold text-[#faf8f5] shadow-sm hover:brightness-[1.05]",
+          variant === "ghost" &&
+            "border border-line bg-elevated text-cream hover:bg-interactive hover:border-line",
+          variant === "quiet" && "text-muted hover:text-cream hover:bg-interactive/50",
+          className,
+        )}
+      >
+        {children}
+      </button>
+    </AnimateButton>
   );
 }
 
@@ -172,14 +175,14 @@ export function RiskPill({ level, className }: { level: RiskLevel; className?: s
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 py-0.5 font-mono text-[0.72rem] font-medium tracking-wide",
+        "inline-flex items-center gap-1.5 rounded-[8px] border px-2.5 py-1 font-sans text-[0.8rem] font-bold tracking-wide shadow-xs",
         s.bg,
         s.border,
         s.text,
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <Icon className="h-4 w-4 shrink-0 stroke-[2.4]" />
       {s.label}
     </span>
   );

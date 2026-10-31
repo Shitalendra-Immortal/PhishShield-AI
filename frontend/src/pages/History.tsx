@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { motion } from "motion/react";
 import type { ScanResult } from "../types";
-import { Button, Eyebrow, RiskPill, TYPE_LABEL, formatDate, preview } from "../components/ui";
+import { Button, RiskPill, TYPE_LABEL, formatDate, preview } from "../components/ui";
 import { cn } from "../utils/cn";
 
 type Filter = "all" | "phishing" | "suspicious" | "safe";
@@ -57,8 +57,7 @@ export function History({
     <div className="mx-auto w-full max-w-5xl animate-rise">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Eyebrow>Archive</Eyebrow>
-          <h1 className="mt-4 font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[2.8rem]">
+          <h1 className="font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[2.8rem]">
             Scan history.
           </h1>
           <p className="mt-2.5 max-w-md font-sans text-[0.96rem] leading-[1.7] text-muted">
@@ -90,7 +89,7 @@ export function History({
                 className={cn(
                   "relative rounded-[10px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring",
                   isActive
-                    ? "font-semibold text-[#1B1011]"
+                    ? "font-semibold text-[#faf8f5]"
                     : "text-muted hover:text-cream hover:bg-interactive/40",
                 )}
               >

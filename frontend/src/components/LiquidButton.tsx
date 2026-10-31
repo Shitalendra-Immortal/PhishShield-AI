@@ -45,11 +45,11 @@ function LiquidButton(props: LiquidButtonProps) {
 
 const variantStyles: Record<string, string> = {
   primary:
-    "[--liquid-button-background-color:#f15b3b] [--liquid-button-color:#141211] text-[#141211] hover:text-[#faf8f5] shadow-sm font-semibold",
+    "[--liquid-button-bg:linear-gradient(135deg,#f15b3b_0%,#ff874c_100%)] [--liquid-button-color:#d94420] text-[#faf8f5] hover:text-white shadow-sm font-semibold",
   flame:
-    "[--liquid-button-background-color:#f15b3b] [--liquid-button-color:#b9300e] text-[#141211] hover:text-white shadow-sm font-semibold",
+    "[--liquid-button-bg:linear-gradient(135deg,#f15b3b_0%,#ff874c_100%)] [--liquid-button-color:#b9300e] text-[#faf8f5] hover:text-white shadow-sm font-semibold",
   dark:
-    "[--liquid-button-background-color:#181615] [--liquid-button-color:#f15b3b] text-[#faf8f5] hover:text-[#141211] border border-line font-medium",
+    "[--liquid-button-background-color:#181615] [--liquid-button-color:#ff7550] text-[#faf8f5] hover:text-[#141211] border border-line font-medium",
   default:
     "[--liquid-button-background-color:var(--color-elevated)] [--liquid-button-color:var(--color-flame)] text-cream hover:text-[#141211] border border-line font-medium",
 };
@@ -100,8 +100,8 @@ function LiquidButtonContent({
           "--liquid-button-fill-height": fillHeight,
           "--liquid-button-delay": "0s",
           background:
-            "linear-gradient(var(--liquid-button-color) 0 0) no-repeat calc(200% - var(--liquid-button-fill-width, -1%)) 100% / 200% var(--liquid-button-fill-height, 0.2em)",
-          backgroundColor: "var(--liquid-button-background-color)",
+            "linear-gradient(var(--liquid-button-color) 0 0) no-repeat calc(200% - var(--liquid-button-fill-width, -1%)) 100% / 200% var(--liquid-button-fill-height, 0.2em), var(--liquid-button-bg, var(--liquid-button-background-color))",
+          backgroundColor: "var(--liquid-button-background-color, transparent)",
           transition: `background ${delay} var(--liquid-button-delay, 0s), color ${delay} ${delay}, background-position ${delay} calc(${delay} - var(--liquid-button-delay, 0s))`,
           ...style,
         } as React.CSSProperties

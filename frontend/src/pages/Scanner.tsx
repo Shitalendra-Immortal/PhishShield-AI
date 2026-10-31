@@ -3,7 +3,7 @@ import { AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 import type { ScanType } from "../types";
 import { PLACEHOLDERS } from "../lib/samples";
-import { Button, Eyebrow } from "../components/ui";
+import { Button } from "../components/ui";
 import { cn } from "../utils/cn";
 
 const TABS: { id: ScanType; label: string }[] = [
@@ -98,8 +98,7 @@ export function Scanner({
   return (
     <div className="mx-auto w-full max-w-3xl animate-rise">
       <div className="text-center">
-        <Eyebrow>Threat inspection</Eyebrow>
-        <h1 className="mx-auto mt-4 max-w-2xl font-display text-[2.4rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[3.2rem]">
+        <h1 className="mx-auto max-w-2xl font-display text-[2.4rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[3.2rem]">
           Check before <span className="text-gradient">you click.</span>
         </h1>
         <p className="mx-auto mt-3 max-w-xl font-sans text-[0.96rem] leading-[1.7] text-muted sm:text-[1.02rem]">
@@ -122,7 +121,7 @@ export function Scanner({
                 className={cn(
                   "relative flex-1 rounded-[10px] px-4 py-2 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring",
                   isActive
-                    ? "font-semibold text-[#1B1011]"
+                    ? "font-semibold text-[#faf8f5]"
                     : "text-muted hover:text-cream hover:bg-interactive/40",
                 )}
               >
@@ -150,7 +149,7 @@ export function Scanner({
         <div className="relative">
           {/* Input field: 10px radius */}
           {type === "url" ? (
-            <div className="rounded-[10px] border border-line-soft bg-elevated/40 p-3 transition-colors focus-within:border-flame/70 focus-within:ring-1 focus-within:ring-flame/50">
+            <div className="rounded-[10px] border border-line-soft bg-elevated/40 p-3.5 transition-colors focus-within:border-flame/70 focus-within:ring-1 focus-within:ring-flame/50">
               <input
                 value={value}
                 onChange={(e) => {
@@ -163,7 +162,7 @@ export function Scanner({
                 spellCheck={false}
                 autoComplete="off"
                 disabled={busy}
-                className="w-full border-none bg-transparent font-mono text-[0.98rem] text-cream outline-none placeholder:text-muted/60"
+                className="w-full border-none bg-transparent font-sans text-[0.96rem] text-cream outline-none placeholder:text-muted/60"
               />
             </div>
           ) : (
