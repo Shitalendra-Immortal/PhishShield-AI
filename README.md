@@ -40,7 +40,7 @@ PhishShield AI**.
   `API_CONTRACT.md` (the frontend/backend contract).
 - `ai-service/` — Independent Gemini second-opinion service. See
   `ai-service/README.md`.
-- Frontend — Vite + React + TypeScript app at the repo root (`index.html`,
+- Frontend — Vite + React + TypeScript app in `frontend/` (`index.html`,
   `src/`, `package.json`): dashboard, URL/SMS/email scanner, results page
   with risk visualisation, and scan history.
 
@@ -65,6 +65,7 @@ GEMINI_API_KEY=your-key npm start   # listens on PORT (default 4000)
 Frontend:
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
