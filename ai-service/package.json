@@ -1,0 +1,1 @@
+{"dependencies":{"dotenv":"^16.4.5","express":"^4.21.2"},"description":"PhishShield AI service (contract v1): a second-opinion phishing analyst for Member 2's backend. Never stores inputs, never fetches URLs.","engines":{"node":">=18"},"main":"server.js","name":"phishshield-ai-service","scripts":{"start":"node server.js","test":"node test.js"},"type":"commonjs","version":"1.0.0"}
