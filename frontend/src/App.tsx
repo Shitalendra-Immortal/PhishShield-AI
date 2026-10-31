@@ -19,6 +19,19 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [view, active?.id]);
 
+  // Synchronize dark/light theme on document root
+  useEffect(() => {
+    const theme = settings.theme || "light";
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    }
+  }, [settings.theme]);
+
   const navigate = useCallback((next: View) => {
     setView(next);
     if (next !== "result") setActive(null);
@@ -28,6 +41,7 @@ export default function App() {
     async (input: string, type: ScanType) => {
       const mode = type === "url" ? "url" : "message";
       const apiRes = await analyzeInput(input, mode);
+
       const scan: ScanResult = {
         id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         type,
@@ -44,6 +58,8 @@ export default function App() {
         redirectChain: apiRes.redirectChain,
         finalUrl: apiRes.finalUrl,
         threatIntel: apiRes.threatIntel,
+        ai: apiRes.ai,
+        aiOpinion: apiRes.ai,
       };
 
       add(scan);

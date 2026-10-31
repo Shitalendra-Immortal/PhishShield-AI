@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
+import { motion } from "motion/react";
 import type { ScanType } from "../types";
-import { PLACEHOLDERS, SAMPLES } from "../lib/samples";
-import { fetchSamples, type SampleItem } from "../lib/api";
+import { PLACEHOLDERS } from "../lib/samples";
 import { Button, Eyebrow } from "../components/ui";
 import { cn } from "../utils/cn";
 
@@ -13,10 +13,23 @@ const TABS: { id: ScanType; label: string }[] = [
 ];
 
 const STAGES = [
-  "Connecting to PhishShield API",
-  "Evaluating threat intelligence & signals",
-  "Calculating risk score",
+  "Connecting to PhishShield API…",
+  "Evaluating threat intelligence & forensics…",
+  "Calculating normalized risk score…",
 ];
+
+/* ── Animate UI Motion Tokens ─────────────────────────────────── */
+const SPRING_SELECTION = {
+  type: "spring" as const,
+  stiffness: 340,
+  damping: 30,
+};
+
+const SPRING_PRESS = {
+  type: "spring" as const,
+  stiffness: 550,
+  damping: 30,
+};
 
 export function Scanner({
   onAnalyse,
@@ -30,29 +43,22 @@ export function Scanner({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState(0);
-  const [apiSamples, setApiSamples] = useState<SampleItem[]>([]);
   const timers = useRef<number[]>([]);
-
-  useEffect(() => {
-    fetchSamples().then((items) => {
-      if (items.length > 0) setApiSamples(items);
-    });
-  }, []);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const submit = async () => {
     const input = value.trim();
     if (!input) {
-      setError(`Paste ${type === "url" ? "a link" : "the content"} you want to inspect.`);
+      setError(`Please paste or enter ${type === "url" ? "a link" : "the content"} you want to inspect.`);
       return;
     }
     if (input.length > 5000) {
-      setError("Input is too long (maximum 5000 characters).");
+      setError("Input is too long (maximum 5,000 characters).");
       return;
     }
     if (type === "url" && !/\.[a-z]{2,}/i.test(input) && !/^(https?|data|javascript):/i.test(input)) {
-      setError("That does not look like a web address. Include the full link.");
+      setError("That does not look like a valid web address. Include the full URL (e.g. https://example.com).");
       return;
     }
 
@@ -60,18 +66,24 @@ export function Scanner({
     setBusy(true);
     setStage(0);
 
-    const t1 = window.setTimeout(() => setStage(1), 300);
-    const t2 = window.setTimeout(() => setStage(2), 650);
+    const t1 = window.setTimeout(() => setStage(1), 350);
+    const t2 = window.setTimeout(() => setStage(2), 700);
     timers.current = [t1, t2];
 
     try {
       await onAnalyse(input, type);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Failed to connect to PhishShield API. Please check your network.";
-      setError(msg);
+      const msg = err instanceof Error ? err.message : String(err);
+      const isNetworkError =
+        msg.includes("Failed to fetch") ||
+        msg.includes("network") ||
+        msg.includes("Failed to connect") ||
+        msg.includes("NetworkError");
+
+      const userMessage = isNetworkError
+        ? "Unable to reach PhishShield analysis service. The backend server may be waking up or temporarily unavailable. Please click Retry below."
+        : msg;
+      setError(userMessage);
     } finally {
       timers.current.forEach(clearTimeout);
       setBusy(false);
@@ -83,118 +95,111 @@ export function Scanner({
     setError(null);
   };
 
-  const applySample = (sampleText: string) => {
-    setValue(sampleText);
-    setError(null);
-  };
-
   return (
     <div className="mx-auto w-full max-w-3xl animate-rise">
       <div className="text-center">
         <Eyebrow>Threat inspection</Eyebrow>
-        <h1 className="mx-auto mt-6 max-w-2xl font-display text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.045em] text-cream sm:text-[3.6rem]">
+        <h1 className="mx-auto mt-4 max-w-2xl font-display text-[2.4rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[3.2rem]">
           Check before <span className="text-gradient">you click.</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-xl text-[1rem] leading-[1.75] text-muted sm:text-[1.05rem]">
+        <p className="mx-auto mt-3 max-w-xl font-sans text-[0.96rem] leading-[1.7] text-muted sm:text-[1.02rem]">
           Paste a suspicious message, email or URL to inspect potential threats with live threat intelligence.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="mt-10 flex justify-center">
-        <div className="flex w-full max-w-sm items-center gap-1 rounded-full border border-line bg-ink-2/70 p-1 backdrop-blur-xl">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => switchTab(tab.id)}
-              className={cn(
-                "flex-1 rounded-full px-4 py-2.5 text-[0.88rem] font-medium transition-all duration-300 outline-none focus-visible:focus-ring",
-                type === tab.id
-                  ? "bg-flame-gradient text-[#1B1011] shadow-[0_10px_26px_-14px_rgba(241,91,59,0.9)]"
-                  : "text-muted hover:text-cream",
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* Tabs: 16px container radius, 10px tab item radius */}
+      <div className="mt-8 flex justify-center">
+        <div className="relative flex w-full max-w-sm items-center gap-1 rounded-[16px] border border-line bg-surface p-1 shadow-sm">
+          {TABS.map((tab) => {
+            const isActive = type === tab.id;
+            return (
+              <motion.button
+                key={tab.id}
+                type="button"
+                onClick={() => switchTab(tab.id)}
+                whileTap={{ scale: 0.97 }}
+                transition={SPRING_PRESS}
+                className={cn(
+                  "relative flex-1 rounded-[10px] px-4 py-2 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring",
+                  isActive
+                    ? "font-semibold text-[#1B1011]"
+                    : "text-muted hover:text-cream hover:bg-interactive/40",
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="scanner-tab-active"
+                    className="absolute inset-0 rounded-[10px] bg-flame-gradient shadow-sm"
+                    transition={SPRING_SELECTION}
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </motion.button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Input panel */}
-      <section className="relative mt-8 overflow-hidden rounded-[30px] border border-line bg-card/70 p-6 backdrop-blur-xl sm:p-8">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-20 -top-28 h-64 w-64 rounded-full bg-flame/20 blur-[90px]"
-        />
-        <div className="absolute inset-x-0 top-0 h-px hairline-top opacity-70" />
-
+      {/* Input panel: 16px radius main card, solid tonal surface */}
+      <section
+        className={cn(
+          "relative mt-6 overflow-hidden rounded-[16px] border bg-surface p-6 transition-all sm:p-8",
+          error ? "border-danger/40" : "border-line",
+        )}
+      >
         <div className="relative">
+          {/* Input field: 10px radius */}
           {type === "url" ? (
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder={PLACEHOLDERS.url}
-              aria-label="URL to analyse"
-              spellCheck={false}
-              autoComplete="off"
-              disabled={busy}
-              className="w-full border-none bg-transparent py-6 font-mono text-[0.98rem] text-cream outline-none placeholder:text-muted/60 sm:text-[1.05rem]"
-            />
+            <div className="rounded-[10px] border border-line-soft bg-elevated/40 p-3 transition-colors focus-within:border-flame/70 focus-within:ring-1 focus-within:ring-flame/50">
+              <input
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  if (error) setError(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                placeholder={PLACEHOLDERS.url}
+                aria-label="URL to analyse"
+                spellCheck={false}
+                autoComplete="off"
+                disabled={busy}
+                className="w-full border-none bg-transparent font-mono text-[0.98rem] text-cream outline-none placeholder:text-muted/60"
+              />
+            </div>
           ) : (
-            <textarea
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={PLACEHOLDERS[type]}
-              aria-label={type === "email" ? "Email content to analyse" : "Message to analyse"}
-              spellCheck={false}
-              rows={9}
-              disabled={busy}
-              className="w-full resize-none border-none bg-transparent text-[1rem] leading-[1.8] text-cream outline-none placeholder:text-muted/60"
-            />
+            <div className="rounded-[10px] border border-line-soft bg-elevated/40 p-3.5 transition-colors focus-within:border-flame/70 focus-within:ring-1 focus-within:ring-flame/50">
+              <textarea
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder={PLACEHOLDERS[type]}
+                aria-label={type === "email" ? "Email content to analyse" : "Message to analyse"}
+                spellCheck={false}
+                rows={8}
+                disabled={busy}
+                className="w-full resize-none border-none bg-transparent font-sans text-[0.96rem] leading-[1.8] text-cream outline-none placeholder:text-muted/60"
+              />
+            </div>
           )}
 
-          {/* Sample chips */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 pt-2">
-            <span className="flex items-center gap-1.5 text-[0.76rem] uppercase tracking-wider text-muted/70">
-              <Sparkles className="h-3 w-3 text-peach/70" /> Try a sample:
-            </span>
-            {apiSamples.length > 0 ? (
-              apiSamples.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => applySample(s.input)}
-                  className="rounded-full border border-line-soft bg-white/[0.03] px-3 py-1 text-[0.78rem] text-muted transition-colors hover:border-white/20 hover:text-cream"
-                >
-                  {s.label}
-                </button>
-              ))
-            ) : (
-              <button
-                type="button"
-                onClick={() => applySample(SAMPLES[type])}
-                className="rounded-full border border-line-soft bg-white/[0.03] px-3 py-1 text-[0.78rem] text-muted transition-colors hover:border-white/20 hover:text-cream"
-              >
-                Load {type} example
-              </button>
-            )}
-          </div>
-
           <div className="mt-6 flex flex-col gap-4 border-t border-line-soft pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4 text-[0.82rem] text-muted">
+            <div className="flex items-center gap-4 text-[0.84rem] text-muted">
               {value.length > 0 && (
                 <>
                   <button
                     type="button"
-                    onClick={() => setValue("")}
-                    className="transition-colors hover:text-cream"
+                    onClick={() => {
+                      setValue("");
+                      setError(null);
+                    }}
+                    className="font-sans transition-colors hover:text-cream focus-visible:focus-ring rounded-[6px]"
                   >
                     Clear
                   </button>
-                  <span className="h-3 w-px bg-white/15" />
-                  <span className="font-mono text-[0.76rem] text-muted/70">
+                  <span className="h-3 w-px bg-line" />
+                  <span className="font-mono text-[0.8rem] text-muted">
                     {value.length} / 5000 chars
                   </span>
                 </>
@@ -202,33 +207,60 @@ export function Scanner({
             </div>
 
             <Button size="lg" onClick={submit} disabled={busy} className="w-full sm:w-auto">
-              {busy ? "Analysing…" : "Analyse Threat"}
+              {busy ? (
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Analysing Threat…
+                </span>
+              ) : (
+                "Analyse Threat"
+              )}
             </Button>
           </div>
 
+          {/* Error notification with Retry action */}
           {error && (
-            <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 p-3.5 text-[0.86rem] text-[#FF9B88]">
-              {error}
+            <div className="mt-5 rounded-[10px] border border-danger/30 bg-danger/10 p-4 text-[0.88rem] text-[#FFB0A0] animate-fade">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+                  <div className="font-sans leading-relaxed text-cream/90">{error}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={busy}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] border border-danger/40 bg-danger/20 px-3 py-1 font-sans text-[0.8rem] font-semibold text-cream transition-colors hover:bg-danger/30 focus-visible:focus-ring"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Retry
+                </button>
+              </div>
             </div>
           )}
 
+          {/* Scanning Progress & Animated Status */}
           {busy && (
-            <div className="mt-6 animate-fade">
-              <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-white/[0.07]">
-                <span className="absolute inset-y-0 w-1/3 rounded-full bg-flame-gradient animate-sweep" />
+            <div className="mt-6 rounded-[12px] border border-line-soft bg-elevated p-4 animate-fade">
+              <div className="relative h-2 w-full overflow-hidden rounded-[6px] bg-interactive border border-line">
+                <span className="absolute inset-y-0 w-2/5 rounded-[6px] bg-flame-gradient animate-sweep" />
               </div>
-              <p className="mt-3 font-mono text-[0.76rem] uppercase tracking-[0.18em] text-muted">
-                {STAGES[stage]}
-              </p>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="font-mono text-[0.8rem] uppercase tracking-[0.14em] text-cream flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-flame animate-pulse" />
+                  {STAGES[stage]}
+                </p>
+                <span className="font-mono text-[0.76rem] text-muted">Step {stage + 1} of 3</span>
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      <p className="mt-6 flex items-start justify-center gap-2.5 text-center text-[0.84rem] leading-relaxed text-muted">
-        <ShieldCheck className="mt-[2px] h-4 w-4 shrink-0 text-peach/70" />
+      <p className="mt-6 flex items-start justify-center gap-2.5 text-center font-sans text-[0.86rem] leading-relaxed text-muted">
+        <ShieldCheck className="mt-[2px] h-4 w-4 shrink-0 text-peach" />
         <span>
-          Analyzed in memory by PhishShield API. Inputs are never stored or logged.
+          Analyzed in memory via PhishShield API. Inputs are never stored or logged.
         </span>
       </p>
     </div>

@@ -2,49 +2,60 @@
 
 @theme {
   /* ── Surfaces ─────────────────────────────── */
-  --color-ink: #171719;
-  --color-ink-2: #202023;
-  --color-card: #262427;
-  --color-elevated: #302c2d;
+  --color-ink: var(--color-ink);
+  --color-surface: var(--color-surface);
+  --color-card: var(--color-card);
+  --color-elevated: var(--color-elevated);
+  --color-interactive: var(--color-interactive);
 
   /* ── Brand warmth ─────────────────────────── */
   --color-flame: #f15b3b;
   --color-ember: #ff874c;
   --color-peach: #ffc18a;
-  --color-cream: #f1ebdd;
-  --color-muted: #a9a29c;
+  --color-cream: var(--color-cream);
+  --color-muted: var(--color-muted);
+
+  /* ── Borders ──────────────────────────────── */
+  --color-line: var(--color-line);
+  --color-line-soft: var(--color-line-soft);
 
   /* ── Semantics ────────────────────────────── */
-  --color-safe: #7fb98a;
-  --color-warn: #f0a24b;
-  --color-danger: #e8503c;
+  --color-safe: var(--color-safe);
+  --color-warn: var(--color-warn);
+  --color-danger: var(--color-danger);
 
-  --color-line: rgba(255, 255, 255, 0.1);
-  --color-line-soft: rgba(255, 255, 255, 0.06);
+  /* ── Typography ───────────────────────────── */
+  --font-display: "Sora", sans-serif;
+  --font-brand: "Space Grotesk", sans-serif;
+  --font-sans: "DM Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 
-  --font-display: "Sora", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  /* ── Radius Scale ─────────────────────────── */
+  --radius-hero: 20px;
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --radius-input: 10px;
+  --radius-nav: 16px;
+  --radius-badge: 6px;
+  --radius-logo: 9px;
 
-  --radius-4xl: 2rem;
-  --radius-5xl: 2.75rem;
-
-  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-fade: fade 0.6s ease both;
+  /* ── Animations ───────────────────────────── */
+  --animate-rise: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade: fade 0.35s ease both;
   --animate-sweep: sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  --animate-breathe: breathe 9s ease-in-out infinite;
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
 @keyframes fade {
   from {
     opacity: 0;
@@ -53,6 +64,7 @@
     opacity: 1;
   }
 }
+
 @keyframes sweep {
   0% {
     transform: translateX(-100%);
@@ -61,19 +73,75 @@
     transform: translateX(260%);
   }
 }
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1) translate3d(0, 0, 0);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.08) translate3d(0, -1.5%, 0);
-    opacity: 1;
-  }
-}
 
 @layer base {
+  :root,
+  [data-theme="light"],
+  html.light,
+  body.light {
+    /* Light theme (default) */
+    --color-ink: #f4f0e9;
+    --color-surface: #fbf9f5;
+    --color-card: #fbf9f5;
+    --color-elevated: #ede7de;
+    --color-interactive: #e4dbd0;
+    --color-line: #ddd6ca;
+    --color-line-soft: #e7e2d8;
+    --color-cream: #211f1e;
+    --color-muted: #716b65;
+
+    --color-safe: #2f8546;
+    --color-warn: #b86208;
+    --color-danger: #cf3826;
+
+    --hero-ring-subtle: rgba(33, 31, 30, 0.1);
+    --hero-ring-mid: rgba(33, 31, 30, 0.18);
+    --hero-ring-brand: rgba(241, 91, 59, 0.45);
+    --hero-ring-inner: rgba(241, 91, 59, 0.6);
+    --hero-reticle: rgba(241, 91, 59, 0.75);
+    --hero-shield-fill-1: rgba(251, 249, 245, 0.9);
+    --hero-shield-fill-2: rgba(237, 231, 222, 0.75);
+    --hero-shield-stroke-1: #e44d2d;
+    --hero-shield-stroke-2: #f15b3b;
+    --hero-shield-inner: rgba(228, 77, 45, 0.45);
+    --hero-node-core: #e44d2d;
+    --hero-node-ring: rgba(241, 91, 59, 0.5);
+    --hero-radar-beam: rgba(228, 77, 45, 0.8);
+  }
+
+  [data-theme="dark"],
+  html.dark,
+  body.dark {
+    /* Dark theme */
+    --color-ink: #171719;
+    --color-surface: #1d1b1d;
+    --color-card: #1d1b1d;
+    --color-elevated: #252326;
+    --color-interactive: #302c2d;
+    --color-line: #2b282b;
+    --color-line-soft: #232023;
+    --color-cream: #f1ebdd;
+    --color-muted: #a9a29c;
+
+    --color-safe: #7fb98a;
+    --color-warn: #f0a24b;
+    --color-danger: #e8503c;
+
+    --hero-ring-subtle: rgba(255, 255, 255, 0.08);
+    --hero-ring-mid: rgba(255, 255, 255, 0.14);
+    --hero-ring-brand: rgba(241, 91, 59, 0.35);
+    --hero-ring-inner: rgba(255, 135, 76, 0.4);
+    --hero-reticle: rgba(241, 91, 59, 0.5);
+    --hero-shield-fill-1: rgba(241, 91, 59, 0.08);
+    --hero-shield-fill-2: rgba(29, 27, 29, 0.7);
+    --hero-shield-stroke-1: #f15b3b;
+    --hero-shield-stroke-2: #ff874c;
+    --hero-shield-inner: rgba(255, 193, 138, 0.4);
+    --hero-node-core: #ff874c;
+    --hero-node-ring: rgba(241, 91, 59, 0.4);
+    --hero-radar-beam: rgba(241, 91, 59, 0.75);
+  }
+
   * {
     border-color: var(--color-line);
   }
@@ -90,11 +158,13 @@
     font-feature-settings: "ss01", "cv01";
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 
-  ::selection {
-    background: rgba(241, 91, 59, 0.32);
-    color: var(--color-cream);
+  body, header, section, nav, aside, main, footer {
+    transition: background-color 0.25s ease,
+                border-color 0.25s ease,
+                color 0.25s ease;
   }
 
   h1,
@@ -102,7 +172,8 @@
   h3,
   h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.03em;
+    font-weight: 600;
+    letter-spacing: -0.025em;
   }
 
   input,
@@ -113,65 +184,47 @@
 
   textarea::placeholder,
   input::placeholder {
-    color: rgba(169, 162, 156, 0.55);
+    color: var(--color-muted);
+    opacity: 0.75;
+  }
+
+  ::selection {
+    background: rgba(241, 91, 59, 0.3);
+    color: var(--color-cream);
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.09);
-    border-radius: 99px;
-    border: 3px solid transparent;
-    background-clip: content-box;
+    background: var(--color-line);
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(241, 91, 59, 0.45);
-    background-clip: content-box;
+    background: var(--color-flame);
   }
 }
 
 @utility text-gradient {
-  background-image: linear-gradient(120deg, #e84b35, #f47743, #ffc18a);
+  background-image: linear-gradient(135deg, #f15b3b 0%, #ff874c 50%, #ffc18a 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 @utility bg-flame-gradient {
-  background-image: linear-gradient(120deg, #e84b35, #f47743, #ffc18a);
-}
-
-@utility ambient-field {
-  background-image:
-    radial-gradient(ellipse 70% 55% at 85% 12%, rgba(241, 91, 59, 0.3), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 15% 90%, rgba(255, 135, 76, 0.12), transparent 50%);
-}
-
-@utility grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-}
-
-@utility hairline-top {
-  background-image: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.14) 20%,
-    rgba(255, 193, 138, 0.3) 50%,
-    rgba(255, 255, 255, 0.14) 80%,
-    transparent
-  );
+  background-image: linear-gradient(135deg, #f15b3b 0%, #ff874c 100%);
 }
 
 @utility focus-ring {
   outline: none;
   box-shadow:
-    0 0 0 1px rgba(241, 91, 59, 0.6),
-    0 0 0 5px rgba(241, 91, 59, 0.14);
+    0 0 0 1px rgba(241, 91, 59, 0.8),
+    0 0 0 4px rgba(241, 91, 59, 0.18);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -200,7 +200,7 @@
     }
     if (/(share|send|tell|provide|enter)[^.]{0,25}(otp|pin|cvv|password)/.test(lower)) {
       hit(30, 'Asks you to share an OTP, PIN or password',
-        'No real bank or company ever asks for these. This alone is a red flag.');
+        'Legitimate organizations and banks do not ask for secret credentials via unverified messages. This is a critical risk indicator.');
     }
     if (/(kyc|know your customer)/.test(lower) &&
         /(update|complete|verify|pending|incomplete|expire)/.test(lower)) {
@@ -226,7 +226,7 @@
     }
     if (/\bapk\b/.test(lower)) {
       hit(15, 'APK download lure',
-        'Scam messages push fake bank apps as APK files; real banks never distribute apps this way.');
+        'Scam messages frequently push malicious APK files pretending to be official banking software.');
     }
     if (/(sbi|hdfc|icici|paytm|phonepe|upi|bank)/.test(lower) &&
         /(download|install)[^.]{0,20}app/.test(lower)) {

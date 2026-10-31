@@ -62,6 +62,21 @@ export interface Highlight {
   label: string;
 }
 
+export interface AiSignal {
+  type: string;
+  detail: string;
+}
+
+export interface AiSecondOpinion {
+  available: boolean;
+  assessment?: "safe" | "suspicious" | "phishing" | null;
+  confidence?: "low" | "medium" | "high" | null;
+  signals?: AiSignal[];
+  explanation?: string | null;
+  recommendedAction?: string | null;
+  error?: string | null;
+}
+
 export interface ScanResult {
   id: string;
   type: ScanType;
@@ -84,11 +99,16 @@ export interface ScanResult {
   highlights?: Highlight[];
   recommendations?: string[];
   confidence?: number;
+  ai?: AiSecondOpinion | null;
+  aiOpinion?: AiSecondOpinion | null;
 }
 
 export type Sensitivity = "balanced" | "strict";
 
+export type ThemeMode = "dark" | "light";
+
 export interface Settings {
   sensitivity: Sensitivity;
   storeHistory: boolean;
+  theme?: ThemeMode;
 }

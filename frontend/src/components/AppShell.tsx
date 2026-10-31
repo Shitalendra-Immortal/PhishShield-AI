@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Moon, Sun, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type { Settings } from "../types";
 import { cn } from "../utils/cn";
-import { Button, Eyebrow, Wordmark } from "./ui";
+import { Button, Eyebrow, ThreatIcon, Wordmark } from "./ui";
 
 export type View = "overview" | "scan" | "history" | "result";
 
@@ -12,59 +13,117 @@ const NAV: { id: View; label: string }[] = [
   { id: "history", label: "History" },
 ];
 
-/* ── Ambient background ───────────────────────────────────────── */
+/* ── Animate UI Motion Tokens ─────────────────────────────────── */
+const SPRING_SELECTION = {
+  type: "spring" as const,
+  stiffness: 340,
+  damping: 30,
+};
 
-function Atmosphere() {
+const SPRING_PRESS = {
+  type: "spring" as const,
+  stiffness: 550,
+  damping: 30,
+};
+
+/* ── Theme Toggle Component (Solid Tonal) ─────────────────────── */
+
+function ThemeToggle({
+  theme,
+  onToggle,
+}: {
+  theme: "dark" | "light";
+  onToggle: () => void;
+}) {
+  const isDark = theme === "dark";
+
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-ink">
-      <div className="absolute inset-0 ambient-field" />
-      <div className="absolute -right-[12%] -top-[22%] h-[46rem] w-[46rem] rounded-full bg-[radial-gradient(circle,rgba(241,91,59,0.26),transparent_62%)] blur-[40px] animate-breathe" />
-      <div className="absolute -bottom-[26%] -left-[14%] h-[40rem] w-[40rem] rounded-full bg-[radial-gradient(circle,rgba(255,135,76,0.13),transparent_60%)] blur-[50px]" />
-      <div className="absolute inset-0 grain opacity-[0.035] mix-blend-overlay" />
-      <div className="absolute inset-x-0 top-0 h-px hairline-top opacity-60" />
-    </div>
+    <motion.button
+      type="button"
+      onClick={onToggle}
+      whileTap={{ scale: 0.94 }}
+      transition={SPRING_PRESS}
+      className="relative flex h-8.5 w-8.5 items-center justify-center rounded-[10px] border border-line bg-elevated text-muted transition-colors hover:bg-interactive hover:text-cream focus-visible:focus-ring overflow-hidden"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={theme}
+          className="inline-flex items-center justify-center"
+          initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+        >
+          {isDark ? (
+            <Sun className="h-4 w-4 text-peach" />
+          ) : (
+            <Moon className="h-4 w-4 text-flame" />
+          )}
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
   );
 }
 
-/* ── Navigation ───────────────────────────────────────────────── */
+/* ── Solid Tonal Background (Global gradients removed) ────────── */
+
+function Atmosphere() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 -z-10 bg-ink"
+    />
+  );
+}
+
+/* ── Navigation (16px container radius, 10px item radius) ─────── */
 
 function NavPill({
   view,
   onNavigate,
   className,
-  fill,
 }: {
   view: View;
   onNavigate: (v: View) => void;
   className?: string;
-  fill?: boolean;
 }) {
   const active: View = view === "result" ? "scan" : view;
+
   return (
     <nav
       className={cn(
-        "flex items-center gap-1 rounded-full border border-line bg-ink-2/70 p-1 backdrop-blur-xl",
+        "relative flex items-center gap-1 rounded-[16px] border border-line bg-surface p-1 shadow-sm",
         className,
       )}
     >
       {NAV.map((item) => {
         const isActive = active === item.id;
         return (
-          <button
+          <motion.button
             key={item.id}
             type="button"
             onClick={() => onNavigate(item.id)}
+            whileTap={{ scale: 0.97 }}
+            transition={SPRING_PRESS}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "relative rounded-full px-4 py-2 text-[0.86rem] font-medium transition-all duration-300 outline-none focus-visible:focus-ring sm:px-5",
-              fill && "flex-1",
+              "relative rounded-[10px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring sm:px-4 sm:py-1.5",
               isActive
-                ? "bg-flame-gradient text-[#1B1011] shadow-[0_10px_26px_-14px_rgba(241,91,59,0.9)]"
-                : "text-muted hover:text-cream",
+                ? "font-semibold text-[#1B1011]"
+                : "text-muted hover:text-cream hover:bg-interactive/40",
             )}
           >
-            {item.label}
-          </button>
+            {isActive && (
+              <motion.span
+                layoutId="nav-pill-active"
+                className="absolute inset-0 rounded-[10px] bg-flame-gradient shadow-sm"
+                transition={SPRING_SELECTION}
+              />
+            )}
+            <span className="relative z-10">{item.label}</span>
+          </motion.button>
         );
       })}
     </nav>
@@ -103,32 +162,32 @@ function Drawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
-        className="absolute inset-0 bg-ink/70 backdrop-blur-sm animate-fade"
+        className="absolute inset-0 bg-black/60 animate-fade"
         onClick={onClose}
         aria-hidden
       />
-      <aside className="relative h-full w-full max-w-md overflow-y-auto border-l border-line bg-ink-2/95 px-6 py-7 backdrop-blur-2xl animate-rise sm:px-8">
+      <aside className="relative h-full w-full max-w-md overflow-y-auto border-l border-line bg-surface px-6 py-7 shadow-2xl animate-rise sm:px-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Methodology</Eyebrow>
-            <h2 className="mt-2 font-display text-2xl text-cream">How the analysis works</h2>
+            <h2 className="mt-2 font-display text-2xl text-cream font-semibold">How the analysis works</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-line p-2 text-muted transition-colors hover:text-cream"
+            className="rounded-[10px] border border-line bg-elevated p-2 text-muted transition-colors hover:bg-interactive hover:text-cream focus-visible:focus-ring"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mt-7 space-y-6 text-[0.93rem] leading-relaxed text-muted">
+        <div className="mt-7 space-y-6 text-[0.92rem] leading-relaxed text-muted">
           <p>
-            Submissions are analyzed in memory by the PhishShield AI API. Inputs are never stored,
+            Submissions are analyzed in memory by the PhishShield API. Inputs are never stored,
             persisted, or shared.
           </p>
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             {[
               {
                 t: "Language signals",
@@ -147,9 +206,9 @@ function Drawer({
                 d: "Matched signals are weighted and combined with diminishing returns, producing a 0–100 score. Thresholds translate that score into low, suspicious or high risk.",
               },
             ].map((item) => (
-              <div key={item.t} className="rounded-2xl border border-line-soft bg-white/[0.02] p-4">
-                <p className="font-display text-[0.98rem] text-cream">{item.t}</p>
-                <p className="mt-1.5 text-[0.88rem] leading-relaxed">{item.d}</p>
+              <div key={item.t} className="rounded-[16px] border border-line-soft bg-elevated p-4">
+                <p className="font-display text-[0.96rem] font-semibold text-cream">{item.t}</p>
+                <p className="mt-1 text-[0.86rem] leading-relaxed text-muted">{item.d}</p>
               </div>
             ))}
           </div>
@@ -159,22 +218,48 @@ function Drawer({
           <Eyebrow>Settings</Eyebrow>
 
           <div className="mt-5 space-y-6">
+            {/* Theme switcher */}
             <div>
-              <p className="text-[0.95rem] text-cream">Detection sensitivity</p>
-              <p className="mt-1 text-[0.85rem] text-muted">
+              <p className="font-sans text-[0.92rem] font-medium text-cream">Appearance</p>
+              <p className="mt-0.5 text-[0.84rem] text-muted">
+                Toggle between dark and light workspace theme.
+              </p>
+              <div className="mt-3 flex gap-1 rounded-[12px] border border-line bg-elevated p-1">
+                {(["dark", "light"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => onUpdate({ theme: t })}
+                    className={cn(
+                      "flex-1 rounded-[8px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium capitalize transition-all",
+                      (settings.theme || "light") === t
+                        ? "bg-flame-gradient font-semibold text-[#1B1011] shadow-sm"
+                        : "text-muted hover:text-cream hover:bg-interactive/50",
+                    )}
+                  >
+                    {t === "dark" ? "Dark Mode" : "Light Mode"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sensitivity */}
+            <div>
+              <p className="font-sans text-[0.92rem] font-medium text-cream">Detection sensitivity</p>
+              <p className="mt-0.5 text-[0.84rem] text-muted">
                 Strict lowers the thresholds so borderline content is flagged sooner.
               </p>
-              <div className="mt-3 flex gap-1 rounded-full border border-line bg-white/[0.03] p-1">
+              <div className="mt-3 flex gap-1 rounded-[12px] border border-line bg-elevated p-1">
                 {(["balanced", "strict"] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => onUpdate({ sensitivity: s })}
                     className={cn(
-                      "flex-1 rounded-full px-4 py-2 text-[0.85rem] font-medium capitalize transition-all",
+                      "flex-1 rounded-[8px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium capitalize transition-all",
                       settings.sensitivity === s
-                        ? "bg-flame-gradient text-[#1B1011]"
-                        : "text-muted hover:text-cream",
+                        ? "bg-flame-gradient font-semibold text-[#1B1011] shadow-sm"
+                        : "text-muted hover:text-cream hover:bg-interactive/50",
                     )}
                   >
                     {s}
@@ -183,10 +268,11 @@ function Drawer({
               </div>
             </div>
 
+            {/* History Toggle */}
             <div className="flex items-center justify-between gap-6">
               <div>
-                <p className="text-[0.95rem] text-cream">Keep scan history</p>
-                <p className="mt-1 text-[0.85rem] text-muted">Stored locally on this device only.</p>
+                <p className="font-sans text-[0.92rem] font-medium text-cream">Keep scan history</p>
+                <p className="mt-0.5 text-[0.84rem] text-muted">Stored locally on this device only.</p>
               </div>
               <button
                 type="button"
@@ -194,16 +280,16 @@ function Drawer({
                 aria-checked={settings.storeHistory}
                 onClick={() => onUpdate({ storeHistory: !settings.storeHistory })}
                 className={cn(
-                  "relative h-7 w-12 shrink-0 rounded-full border transition-colors",
+                  "relative h-6.5 w-11 shrink-0 rounded-[10px] border transition-colors",
                   settings.storeHistory
-                    ? "border-transparent bg-flame-gradient"
-                    : "border-line bg-white/[0.06]",
+                    ? "border-flame bg-flame-gradient"
+                    : "border-line bg-interactive",
                 )}
               >
                 <span
                   className={cn(
-                    "absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-cream transition-all duration-300",
-                    settings.storeHistory ? "left-6" : "left-1",
+                    "absolute top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-[7px] bg-cream shadow-sm transition-all duration-200",
+                    settings.storeHistory ? "left-5.5" : "left-1",
                   )}
                 />
               </button>
@@ -211,8 +297,8 @@ function Drawer({
 
             <div className="flex items-center justify-between gap-6 border-t border-line-soft pt-6">
               <div>
-                <p className="text-[0.95rem] text-cream">Stored scans</p>
-                <p className="mt-1 text-[0.85rem] text-muted">{historyCount} on this device</p>
+                <p className="font-sans text-[0.92rem] font-medium text-cream">Stored scans</p>
+                <p className="mt-0.5 text-[0.84rem] text-muted">{historyCount} on this device</p>
               </div>
               <Button variant="ghost" onClick={onClearHistory} disabled={!historyCount}>
                 Clear all
@@ -245,63 +331,69 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
+  const currentTheme = settings.theme || "light";
+
+  const toggleTheme = () => {
+    onUpdateSettings({ theme: currentTheme === "dark" ? "light" : "dark" });
+  };
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-ink text-cream">
       <Atmosphere />
 
-      <header className="sticky top-0 z-40 border-b border-line-soft bg-ink/55 backdrop-blur-xl">
-        <div className="mx-auto flex h-[4.5rem] w-full max-w-[82rem] items-center justify-between gap-4 px-5 sm:px-8">
-          <Wordmark onClick={() => onNavigate("overview")} />
-          <NavPill view={view} onNavigate={onNavigate} className="hidden md:flex" />
-          <div className="flex items-center gap-2">
+      {/* Top Navigation Bar (Solid Tonal) */}
+      <header className="sticky top-0 z-40 border-b border-line bg-surface">
+        <div className="relative mx-auto flex h-16 w-full max-w-[80rem] items-center justify-between px-4 sm:px-8">
+          {/* Logo on the left */}
+          <div className="flex items-center justify-start shrink-0 z-10 sm:w-48">
+            <Wordmark onClick={() => onNavigate("overview")} />
+          </div>
+
+          {/* Primary Nav pinned strictly in the centre of the top bar */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+            <NavPill view={view} onNavigate={onNavigate} />
+          </div>
+
+          {/* Secondary actions on the right */}
+          <div className="flex items-center justify-end gap-2 shrink-0 z-10 sm:w-48">
+            {/* Theme Toggle Button */}
+            <ThemeToggle theme={currentTheme} onToggle={toggleTheme} />
+
             <button
               type="button"
               onClick={() => setDrawer(true)}
-              className="rounded-full border border-line px-4 py-2 text-[0.84rem] text-muted transition-colors hover:border-white/20 hover:text-cream"
+              className="rounded-[12px] border border-line bg-elevated px-3.5 py-1.5 text-[0.84rem] font-sans font-medium text-muted transition-colors hover:bg-interactive hover:text-cream focus-visible:focus-ring"
             >
               Methodology
             </button>
-            {view !== "scan" && (
-              <Button className="hidden sm:inline-flex" onClick={() => onNavigate("scan")}>
-                Start a Scan
-              </Button>
-            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[82rem] px-5 pb-36 pt-10 sm:px-8 sm:pt-14 md:pb-24">
+      {/* Main Content Area */}
+      <main className="mx-auto w-full max-w-[80rem] px-4 pt-6 pb-10 sm:px-8 sm:pt-8 sm:pb-12">
         {children}
       </main>
 
-      <footer className="mx-auto w-full max-w-[82rem] px-5 pb-28 sm:px-8 md:pb-12">
-        <div className="flex flex-col gap-4 border-t border-line-soft pt-8 text-[0.84rem] text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-display tracking-[-0.02em] text-cream/80">PhishShield</p>
-          <p className="max-w-md leading-relaxed">
-            Analysis is processed securely in memory by PhishShield AI API. Nothing you paste is stored on a server.
+      {/* Footer */}
+      <footer className="mx-auto w-full max-w-[80rem] px-4 pb-8 sm:px-8 sm:pb-10">
+        <div className="flex flex-col gap-4 border-t border-line-soft pt-6 text-[0.84rem] text-muted sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <ThreatIcon className="h-5 w-5 shrink-0" />
+            <p className="font-brand font-semibold tracking-[-0.02em] text-cream">PhishShield</p>
+          </div>
+          <p className="max-w-md leading-relaxed text-muted">
+            Analysis is processed securely in memory via the PhishShield API. Submissions are never stored or logged.
           </p>
           <button
             type="button"
             onClick={() => setDrawer(true)}
-            className="self-start text-left transition-colors hover:text-cream sm:self-auto"
+            className="self-start text-left font-sans text-muted transition-colors hover:text-cream sm:self-auto focus-visible:focus-ring"
           >
             Methodology &amp; settings
           </button>
         </div>
       </footer>
-
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-5 md:hidden"
-        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
-      >
-        <NavPill
-          view={view}
-          onNavigate={onNavigate}
-          fill
-          className="w-full max-w-sm bg-ink-2/90 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]"
-        />
-      </div>
 
       <Drawer
         open={drawer}

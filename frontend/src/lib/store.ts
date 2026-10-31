@@ -32,7 +32,11 @@ function write(key: string, value: unknown) {
   }
 }
 
-export const DEFAULT_SETTINGS: Settings = { sensitivity: "balanced", storeHistory: true };
+export const DEFAULT_SETTINGS: Settings = {
+  sensitivity: "balanced",
+  storeHistory: true,
+  theme: "light",
+};
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(() => read(SETTINGS_KEY, DEFAULT_SETTINGS));

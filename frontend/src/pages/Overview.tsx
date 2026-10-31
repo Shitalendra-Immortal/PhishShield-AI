@@ -2,34 +2,96 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import type { ScanResult } from "../types";
 import { Button, Eyebrow, RiskPill, TYPE_LABEL, formatDate, preview } from "../components/ui";
 
+/* ── Purposeful Cybersecurity Visual (Clean geometric, no excessive glow) ── */
+
 function HeroComposition() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] lg:block">
-      <div className="absolute right-[-18%] top-1/2 h-[34rem] w-[34rem] -translate-y-1/2">
-        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,193,138,0.95),rgba(241,91,59,0.75)_42%,rgba(232,75,53,0.1)_70%,transparent_75%)] blur-[2px]" />
-        <div className="absolute inset-[18%] rounded-full bg-ink-2/80 backdrop-blur-xl" />
-        <div className="absolute inset-[18%] rounded-full bg-[radial-gradient(circle_at_70%_80%,rgba(241,91,59,0.35),transparent_60%)]" />
-        <div className="absolute inset-[6%] rounded-full border border-white/10" />
-        <div className="absolute inset-[-8%] rounded-full border border-white/[0.06]" />
-        <div className="absolute inset-[-22%] rounded-full border border-white/[0.04]" />
-        <div className="absolute left-1/2 top-[30%] h-[1px] w-[70%] -translate-x-1/2 bg-gradient-to-r from-transparent via-peach/50 to-transparent" />
-        <div className="absolute left-1/2 top-[62%] h-[1px] w-[52%] -translate-x-1/2 bg-gradient-to-r from-transparent via-cream/25 to-transparent" />
-      </div>
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(38,36,39,0.92)_0%,rgba(38,36,39,0.45)_26%,transparent_52%)]" />
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] lg:flex items-center justify-center overflow-hidden"
+    >
+      <svg
+        className="relative h-[20rem] w-[20rem] select-none text-cream"
+        viewBox="0 0 360 360"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="shieldGrad" x1="180" y1="110" x2="180" y2="250" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="var(--hero-shield-stroke-1)" stopOpacity="0.9" />
+            <stop offset="60%" stopColor="var(--hero-shield-stroke-2)" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="var(--hero-shield-stroke-1)" stopOpacity="0.25" />
+          </linearGradient>
+          <linearGradient id="shieldFill" x1="180" y1="110" x2="180" y2="250" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="var(--hero-shield-fill-1)" />
+            <stop offset="100%" stopColor="var(--hero-shield-fill-2)" />
+          </linearGradient>
+        </defs>
+
+        {/* Concentric scanning rings */}
+        <circle cx="180" cy="180" r="160" stroke="var(--hero-ring-subtle)" strokeWidth="1" strokeDasharray="3 9" />
+        <circle cx="180" cy="180" r="130" stroke="var(--hero-ring-mid)" strokeWidth="1" />
+        <circle cx="180" cy="180" r="95" stroke="var(--hero-ring-brand)" strokeWidth="1" strokeDasharray="5 5" />
+        <circle cx="180" cy="180" r="62" stroke="var(--hero-ring-inner)" strokeWidth="1" />
+
+        {/* Reticle / coordinate axis markers */}
+        <line x1="180" y1="14" x2="180" y2="26" stroke="var(--hero-reticle)" strokeWidth="1.5" />
+        <line x1="180" y1="334" x2="180" y2="346" stroke="var(--hero-reticle)" strokeWidth="1.5" />
+        <line x1="14" y1="180" x2="26" y2="180" stroke="var(--hero-reticle)" strokeWidth="1.5" />
+        <line x1="334" y1="180" x2="346" y2="180" stroke="var(--hero-reticle)" strokeWidth="1.5" />
+
+        {/* Subtle scanning sweep / radar arc */}
+        <g className="origin-center animate-[spin_14s_linear_infinite]">
+          <line
+            x1="180"
+            y1="180"
+            x2="272"
+            y2="88"
+            stroke="var(--hero-radar-beam)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </g>
+
+        {/* Outer subtle shield contour */}
+        <path
+          d="M180 114 L224 132 V182 C224 212 205 236 180 246 C155 236 136 212 136 182 V132 Z"
+          fill="url(#shieldFill)"
+          stroke="url(#shieldGrad)"
+          strokeWidth="1.75"
+        />
+
+        {/* Inner shield geometry */}
+        <path
+          d="M180 128 L212 142 V181 C212 203 198 221 180 229 C162 221 148 203 148 181 V142 Z"
+          stroke="var(--hero-shield-inner)"
+          strokeWidth="1"
+          strokeDasharray="2 3"
+        />
+
+        {/* Central security node with concentric radar echo */}
+        <circle cx="180" cy="180" r="3.5" fill="var(--hero-node-core)" />
+        <circle cx="180" cy="180" r="10" stroke="var(--hero-node-ring)" strokeWidth="1" />
+        <circle cx="180" cy="180" r="18" stroke="var(--hero-node-ring)" strokeWidth="0.75" strokeDasharray="2 3" opacity="0.6" />
+      </svg>
     </div>
   );
 }
 
+/* ── Metrics ─────────────────────────────────────────────────── */
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="px-6 py-7 sm:px-8 sm:py-9">
-      <p className="font-display text-[2.6rem] leading-none tracking-[-0.045em] text-cream tabular-nums sm:text-[3.2rem]">
-        {value.toString().padStart(2, "0")}
+    <div className="px-6 py-5 sm:px-8 sm:py-6">
+      <p className="font-mono text-[2.2rem] font-semibold leading-none tracking-tight text-cream tabular-nums sm:text-[2.6rem]">
+        {value}
       </p>
-      <p className="mt-3 text-[0.88rem] text-muted">{label}</p>
+      <p className="mt-2 font-sans text-[0.84rem] font-medium text-muted">{label}</p>
     </div>
   );
 }
+
+/* ── Overview Dashboard ───────────────────────────────────────── */
 
 export function Overview({
   history,
@@ -46,27 +108,22 @@ export function Overview({
   const recent = history.slice(0, 5);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-[32px] border border-line bg-card/70 backdrop-blur-xl sm:rounded-[40px] animate-rise">
-        <div
-          aria-hidden
-          className="absolute -right-24 -top-40 h-[32rem] w-[32rem] rounded-full bg-flame/20 blur-[110px] lg:hidden"
-        />
+    <div className="space-y-6">
+      {/* Hero Section: 20px radius hero container, solid tonal surface */}
+      <section className="relative overflow-hidden rounded-[20px] border border-line bg-surface animate-rise">
         <HeroComposition />
-        <div className="absolute inset-x-0 top-0 h-px hairline-top" />
 
-        <div className="relative px-6 py-14 sm:px-12 sm:py-20 lg:w-[62%] lg:py-28 lg:pl-16">
+        <div className="relative px-6 py-10 sm:px-10 sm:py-14 lg:w-[60%] lg:py-16 lg:pl-12">
           <Eyebrow>PhishShield</Eyebrow>
-          <h1 className="mt-6 font-display text-[2.6rem] font-semibold leading-[0.96] tracking-[-0.045em] text-cream sm:text-[3.7rem] lg:text-[4.4rem]">
+          <h1 className="mt-4 font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.03em] text-cream sm:text-[2.9rem] lg:text-[3.3rem]">
             Stay ahead of
             <br />
             <span className="text-gradient">digital threats.</span>
           </h1>
-          <p className="mt-7 max-w-lg text-[1.02rem] leading-[1.75] text-muted sm:text-[1.1rem]">
+          <p className="mt-4 max-w-lg font-sans text-[0.96rem] leading-[1.7] text-muted sm:text-[1.02rem]">
             Analyse suspicious messages, emails and links before you interact with them.
           </p>
-          <div className="mt-10 flex flex-wrap items-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button size="lg" onClick={() => onNavigate("scan")}>
               Start a Scan
               <ArrowRight className="h-4 w-4" />
@@ -76,31 +133,31 @@ export function Overview({
             </Button>
           </div>
 
-          <div className="mt-12 max-w-lg border-t border-line-soft pt-5 text-[0.82rem] leading-relaxed text-muted">
-            Language signals · Link forensics · Sender consistency —{" "}
-            <span className="text-cream/70">analysed entirely on your device.</span>
+          <div className="mt-8 max-w-lg border-t border-line-soft pt-4 font-sans text-[0.82rem] leading-relaxed text-muted">
+            Language signals · Link forensics · Threat intelligence —{" "}
+            <span className="text-cream font-medium">processed in memory via PhishShield API.</span>
           </div>
         </div>
       </section>
 
-      {/* Statistics */}
-      <section className="grid grid-cols-1 divide-y divide-white/[0.07] overflow-hidden rounded-[28px] border border-line bg-ink-2/50 backdrop-blur-xl sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      {/* Statistics Section: 16px radius main card, solid tonal surface */}
+      <section className="grid grid-cols-1 divide-y divide-line-soft overflow-hidden rounded-[16px] border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <Stat value={total} label="Total scans" />
         <Stat value={threats} label="Threats detected" />
         <Stat value={safe} label="Low-risk messages" />
       </section>
 
-      {/* Recent activity */}
-      <section className="overflow-hidden rounded-[28px] border border-line bg-card/50 backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-4 px-6 py-5 sm:px-8">
-          <h2 className="font-display text-[1.15rem] tracking-[-0.02em] text-cream">
+      {/* Recent Activity Section: 16px radius main card, solid tonal surface */}
+      <section className="overflow-hidden rounded-[16px] border border-line bg-surface">
+        <div className="flex items-center justify-between gap-4 px-6 py-4 sm:px-8 border-b border-line-soft">
+          <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
             Recent activity
           </h2>
           {total > 0 && (
             <button
               type="button"
               onClick={() => onNavigate("history")}
-              className="inline-flex items-center gap-1 text-[0.85rem] text-muted transition-colors hover:text-cream"
+              className="inline-flex items-center gap-1 font-sans text-[0.84rem] text-muted transition-colors hover:text-cream focus-visible:focus-ring rounded-[6px]"
             >
               All scans
               <ArrowUpRight className="h-3.5 w-3.5" />
@@ -109,36 +166,36 @@ export function Overview({
         </div>
 
         {recent.length === 0 ? (
-          <div className="border-t border-line-soft px-6 py-14 text-center sm:px-8">
-            <p className="font-display text-[1.3rem] tracking-[-0.02em] text-cream">
+          <div className="px-6 py-8 text-center sm:px-8 sm:py-10">
+            <p className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
               Nothing analysed yet.
             </p>
-            <p className="mx-auto mt-3 max-w-sm text-[0.92rem] leading-relaxed text-muted">
+            <p className="mx-auto mt-2 max-w-sm font-sans text-[0.88rem] leading-relaxed text-muted">
               Paste a message, email or link and PhishShield will tell you what it finds.
             </p>
-            <Button className="mt-7" onClick={() => onNavigate("scan")}>
+            <Button className="mt-5" onClick={() => onNavigate("scan")}>
               Start a Scan
             </Button>
           </div>
         ) : (
-          <ul className="border-t border-line-soft">
+          <ul>
             {recent.map((scan) => (
               <li key={scan.id}>
                 <button
                   type="button"
                   onClick={() => onOpenScan(scan)}
-                  className="group flex w-full items-center gap-4 border-b border-line-soft px-6 py-4 text-left transition-colors last:border-b-0 hover:bg-white/[0.03] sm:px-8"
+                  className="group flex w-full items-center gap-4 border-b border-line-soft px-6 py-3.5 text-left transition-colors last:border-b-0 hover:bg-interactive/40 sm:px-8 focus-visible:focus-ring"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[0.95rem] text-cream/90 group-hover:text-cream">
+                    <span className="block truncate font-sans text-[0.92rem] text-cream/90 group-hover:text-cream">
                       {preview(scan.input, 90)}
                     </span>
-                    <span className="mt-1 block text-[0.78rem] text-muted">
+                    <span className="mt-0.5 block font-sans text-[0.76rem] text-muted">
                       {TYPE_LABEL[scan.type]} · {formatDate(scan.createdAt)}
                     </span>
                   </span>
                   <RiskPill level={scan.level} className="hidden sm:inline-flex" />
-                  <span className="w-12 shrink-0 text-right font-mono text-[0.9rem] text-cream tabular-nums">
+                  <span className="w-12 shrink-0 text-right font-mono text-[0.88rem] text-cream tabular-nums font-semibold">
                     {scan.score}
                   </span>
                 </button>

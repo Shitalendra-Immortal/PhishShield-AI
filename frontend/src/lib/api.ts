@@ -1,3 +1,5 @@
+import type { AiSecondOpinion } from "../types";
+
 export interface AnalyzeVerdict {
   level: "safe" | "suspicious" | "phishing";
   label: string;
@@ -26,6 +28,7 @@ export interface AnalyzeResponse {
   redirectChain?: string[];
   finalUrl?: string | null;
   threatIntel?: ThreatIntel;
+  ai?: AiSecondOpinion;
 }
 
 export interface SampleItem {
