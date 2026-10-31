@@ -1,0 +1,1 @@
+{"dependencies":{"express":"^5.3.0"},"description":"PhishShield AI backend — heuristic phishing analysis API (GRAVITON 2026)","main":"server.js","name":"phishshield-api","scripts":{"start":"node server.js"},"version":"1.0.0"}
