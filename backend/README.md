@@ -65,7 +65,17 @@ node tests/ai.test.js
 
 `ai.test.js` covers the AI second-opinion client and server wiring against
 local mock AI services (valid/invalid/timeout/unavailable/disabled cases +
-borderline-only gating).
+borderline-only gating + stricter backend re-validation: duplicate signal
+types, max 5 signals, length caps, non-empty details, assessment/confidence
+vs signals consistency).
+
+`redirect.test.js` covers redirect chains against a local server plus the
+SSRF classifier (IPv6 unique-local/link-local/multicast/documentation,
+IPv4-mapped and NAT64 forms, CGNAT, benchmarking ranges).
+
+`normalization.test.js` covers URL normalisation, the removed "do not
+share" deduction, the HTTP/HTTPS detection, and the weak-signal
+corroboration rule (lone word/TLD score 0, pairs score).
 
 ## Environment variables
 
@@ -74,6 +84,7 @@ borderline-only gating).
 | `PORT` | `3000` | Listen port (Render sets it automatically). |
 | `RATE_LIMIT_MAX` | `100` | Max `/api/analyze` requests per window per IP. |
 | `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) | Rate-limit window. |
+| `RATE_LIMIT_MAX_ENTRIES` | `5000` | Bound on the rate-limit bucket map (distinct IPs); at the cap the oldest bucket is evicted, so a flood of distinct IPs cannot grow memory without limit. |
 | `REDIRECT_ENABLED` | `1` | Set `0` to disable redirect following (deterministic tests). |
 | `REDIRECT_ALLOW_PRIVATE` | unset | Test-only: set `1` to allow redirect fetches to loopback/private hosts. Never set in production (SSRF guard). |
 | `URLHAUS_ENABLED` | `1` | Set `0` to disable URLhaus lookups (deterministic tests). |
@@ -132,6 +143,19 @@ Implemented and demonstrated with tests + live Render checks:
 - Punjabi support: Gurmukhi script + Roman Punjabi message checks mirroring
   the English signals (urgency, block threat, prize, OTP request, KYC,
   financial brand, electricity), plus a Punjabi section in the AI prompt
+- SSRF pinning for redirect fetches: each hop resolves once and the
+  connection is pinned to a validated address (no second DNS lookup, so
+  DNS rebinding cannot steer a fetch to a private host); hostname still
+  used for Host header and TLS verification. Private-range checks extended
+  to IPv6 unique-local (fc00::/7), link-local edges, multicast,
+  documentation, IPv4-mapped and NAT64 forms, plus CGNAT/benchmarking IPv4
+- Weak-signal corroboration in URL scoring: a lone pressure word or a lone
+  suspicious TLD scores 0; either scores only alongside another signal,
+  or together with each other (verified: existing demo scores unchanged)
+- Stricter backend AI validation (defence in depth): the backend
+  re-validates the AI service's response — duplicate signal types, max 5
+  signals, detail/explanation/action length caps, non-empty details, and
+  assessment/confidence backed by at least one signal
 - AI second-opinion wiring (borderline engine scores 30–59 only, additive
   `ai` field, engine verdict never changed) — code + mock tests done
 

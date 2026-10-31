@@ -17,7 +17,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
-const { parseUrl, isPrivateIP, isBlockedHost } = require('./urlParser.js');
+const { parseUrl, isPrivateIP, isBlockedHost, getRegistrableDomain } = require('./urlParser.js');
 const { buildSecurityReport } = require('./securityReport.js');
 const { checkImpersonation } = require('./impersonationChecker.js');
 const { lookupUrlhaus } = require('../urlhaus.js');
@@ -163,4 +163,58 @@ test('report does not re-score heuristics (no double-counting)', async () => {
   // Points are null by design: Member 2 adds nothing from this report
   // to the analyzer.js score without a contract update.
   for (const ind of r.riskIndicators) assert.equal(ind.points, null);
+});
+
+test('parser: IDN, punycode, IP, trailing dot, userinfo, malformed URLs', () => {
+  // IDN: WHATWG URL normalises to punycode; the parser reports the
+  // punycode hostname (homograph detection itself lives in analyzer.js).
+  const idn = parseUrl('https://münchen.de/');
+  assert.ok(idn.hostname.startsWith('xn--'));
+  assert.equal(idn.domain, idn.hostname);
+  // Punycode / homograph form parses as a plain domain.
+  const puny = parseUrl('https://xn--pple-43d.com/login');
+  assert.equal(puny.hostname, 'xn--pple-43d.com');
+  assert.equal(puny.domain, 'xn--pple-43d.com');
+  // IPv4 and IPv6 URLs are IPs; private ones are blocked.
+  const v4 = parseUrl('http://192.168.1.1/admin');
+  assert.equal(v4.isIP, true);
+  assert.equal(v4.isBlockedHost, true);
+  const v6 = parseUrl('http://[::1]/');
+  assert.equal(v6.isIP, true);
+  assert.equal(v6.hostname, '::1');
+  assert.equal(v6.isBlockedHost, true);
+  const v6doc = parseUrl('http://[2001:db8::1]/');
+  assert.equal(v6doc.isIP, true);
+  assert.equal(v6doc.isBlockedHost, true);
+  // Trailing dot is stripped everywhere.
+  const dotted = parseUrl('https://example.com./path');
+  assert.equal(dotted.hostname, 'example.com');
+  assert.equal(dotted.domain, 'example.com');
+  // Userinfo: credentials are exposed, the host is still the real host.
+  const cred = parseUrl('https://user:pass@example.com/');
+  assert.equal(cred.username, 'user');
+  assert.equal(cred.hasCredentials, true);
+  assert.equal(cred.hostname, 'example.com');
+  // Malformed input throws INVALID_URL.
+  assert.throws(() => parseUrl(''), /INVALID_URL/);
+  assert.throws(() => parseUrl('http://'), /INVALID_URL/);
+  assert.throws(() => parseUrl('   '), /INVALID_URL/);
+});
+
+test('registrable domain: free-hosting suffixes are public suffixes', () => {
+  assert.equal(getRegistrableDomain('evil.vercel.app'), 'evil.vercel.app');
+  assert.equal(getRegistrableDomain('sub.evil.vercel.app'), 'evil.vercel.app');
+  assert.equal(getRegistrableDomain('evil.github.io'), 'evil.github.io');
+  assert.equal(getRegistrableDomain('sub.example.co.uk'), 'example.co.uk');
+});
+
+test('impersonation: hosting-subdomain sender mismatch is caught', () => {
+  // Before vercel.app was listed, evil.vercel.app parsed as domain
+  // vercel.app, so a vercel.app sender looked legitimate.
+  const mismatch = checkImpersonation({
+    parsed: parseUrl('https://evil.vercel.app/login'),
+    sender: 'support@vercel.app', senderDisplayName: 'Vercel',
+  });
+  assert.ok(mismatch.indicators.length > 0);
+  assert.ok(mismatch.indicators.some((i) => i.type === 'sender_domain_mismatch'));
 });

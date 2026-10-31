@@ -48,6 +48,23 @@ async function main() {
   short({ ip: '9.9.9.9', socket: {} }, mockRes(), function () { n2++; });
   check('short window resets after expiry', n2 === 2);
 
+  // Bounded bucket map: at maxEntries the oldest bucket is evicted, so
+  // a flood of distinct IPs cannot grow memory without limit.
+  const capped = createRateLimiter({ windowMs: 60 * 1000, max: 2, maxEntries: 3 });
+  let n3 = 0;
+  const hit = function (ip) {
+    const res = mockRes();
+    capped({ ip: ip, socket: {} }, res, function () { n3++; });
+    return res.statusCode;
+  };
+  hit('10.0.0.1'); hit('10.0.0.1');
+  check('capped limiter blocks 3rd call from same IP', hit('10.0.0.1') === 429);
+  hit('10.0.0.2'); hit('10.0.0.3');
+  check('3 buckets fit at cap', n3 === 4);
+  hit('10.0.0.4'); // evicts the oldest bucket (10.0.0.1)
+  check('evicted IP gets a fresh bucket instead of staying blocked',
+    hit('10.0.0.1') === 200 && n3 === 6);
+
   console.log('\n' + passed + ' passed, ' + failed + ' failed.');
   process.exit(failed ? 1 : 0);
 }

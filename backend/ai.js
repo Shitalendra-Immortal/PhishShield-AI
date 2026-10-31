@@ -10,16 +10,31 @@ var SIGNAL_TYPES = [
   'pressure_to_act', 'unusual_sender'
 ];
 
+// Defence in depth: the ai-service validates its own output, but the
+// backend re-validates everything it accepts, so a misbehaving or
+// compromised service can never inject an unchecked opinion into the
+// response. Limits mirror the service's own output limits.
 function isValidOpinion(data) {
   if (!data || data.available !== true) return false;
   if (['safe', 'suspicious', 'phishing'].indexOf(data.assessment) === -1) return false;
   if (['low', 'medium', 'high'].indexOf(data.confidence) === -1) return false;
-  if (!Array.isArray(data.signals)) return false;
+  if (!Array.isArray(data.signals) || data.signals.length > 5) return false;
+  var seen = {};
   for (var i = 0; i < data.signals.length; i++) {
     var s = data.signals[i];
-    if (!s || SIGNAL_TYPES.indexOf(s.type) === -1 || typeof s.detail !== 'string') return false;
+    if (!s || SIGNAL_TYPES.indexOf(s.type) === -1) return false;
+    if (typeof s.detail !== 'string' || s.detail.length === 0 || s.detail.length > 500) return false;
+    if (seen[s.type]) return false; // duplicate signal type
+    seen[s.type] = true;
   }
-  if (typeof data.explanation !== 'string' || typeof data.recommendedAction !== 'string') return false;
+  // Consistency: an alarming assessment, or high confidence, must be
+  // backed by at least one signal. A safe verdict may carry weak
+  // signals, or none. The backend deliberately does NOT re-impose the
+  // service's own high-needs-2 calibration — that is the service's
+  // rule, and second-guessing it here would drop valid opinions.
+  if ((data.assessment !== 'safe' || data.confidence === 'high') && data.signals.length === 0) return false;
+  if (typeof data.explanation !== 'string' || data.explanation.length > 1000) return false;
+  if (typeof data.recommendedAction !== 'string' || data.recommendedAction.length > 300) return false;
   return true;
 }
 

@@ -32,7 +32,7 @@ better integrated, so this adapted version **removes the duplicates**:
 - `securityReport.js` — one combined report using the repo's own
   modules, in API-contract field names: `redirectChain`, `finalUrl`,
   `threatIntel`. It does not re-score anything.
-- `security.test.js` — 9 tests, verified against the real repo files
+- `security.test.js` — 12 tests, verified against the real repo files
   (see below). `index.js` is just a convenience re-export.
 
 ## Output shape
@@ -87,9 +87,9 @@ silently add its points to the v1 score.
 cp -r backend/security /path/to/repo/backend/security
 cd /path/to/repo/backend
 node security/security.test.js
-# 9 passed, 0 failed (verified 2026-10-31 against the real repo files)
+# 12 passed, 0 failed (verified 2026-10-31 against the real repo files)
 node tests/urlhaus.test.js   # repo's own: 8 passed
-node tests/redirect.test.js  # repo's own: 9 passed
+node tests/redirect.test.js  # repo's own: 24 passed
 ```
 
 The security tests import `../analyzer.js`, `../urlhaus.js` and
@@ -127,12 +127,19 @@ Do not commit a real key. Set it in Render's dashboard env vars.
 
 - Brand list is kept in sync with `analyzer.js` `SENDER_BRANDS` by
   hand — if that list changes, update this folder too.
-- Registrable-domain logic uses a small suffix list, not the full
-  public-suffix list.
+- Registrable-domain logic uses a curated suffix list, not the full
+  public-suffix list. It now covers the major free-hosting suffixes
+  (github.io, vercel.app, netlify.app, pages.dev, appspot.com, …),
+  which is where the phishing-relevant gap was; full PSL coverage
+  would need a maintained package (`psl` or `tldts`) as a dependency.
+- IPv6 URLs: WHATWG URL keeps brackets on IPv6 hostnames, so
+  `parseUrl` strips them — otherwise `net.isIP()` sees `[::1]` as
+  not-an-IP and IPv6 URLs slip past the block checks entirely.
 - No page-content fetching, no JavaScript rendering, no domain-age
   check — those are out of scope for v1 in the repo README.
-- DNS-rebinding: `redirect.js` checks the resolved IP at fetch time;
-  a fast-changing DNS record remains a residual risk.
+- DNS-rebinding: fixed in `redirect.js` (each hop resolves once and
+  the connection is pinned to a validated address); this report
+  inherits the fix through the repo's `followRedirects()`.
 
 ## Pushing to branch `feature/url-security`
 

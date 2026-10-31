@@ -80,7 +80,8 @@ app.use(express.json({ limit: '100kb' }));
 // defaults so normal demo use never trips it; override via env for tests.
 app.use('/api/analyze', createRateLimiter({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: Number(process.env.RATE_LIMIT_MAX) || 100
+  max: Number(process.env.RATE_LIMIT_MAX) || 100,
+  maxEntries: Number(process.env.RATE_LIMIT_MAX_ENTRIES) || 5000
 }));
 
 function sendError(res, status, code, message) {

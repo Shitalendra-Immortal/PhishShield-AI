@@ -80,6 +80,58 @@ async function post(path, body, port) {
   check('invented signal type rejected', op === null);
   await close(m.srv);
 
+  // --- stricter backend re-validation (defence in depth) ---
+  const sig = (t) => ({ type: t, detail: 'detail for ' + t });
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: [sig('prize_lure'), sig('prize_lure')] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('duplicate signal type rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: ['prize_lure', 'manufactured_urgency', 'impersonation', 'credential_request', 'suspicious_link', 'unusual_sender'].map(sig) })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('6 signals rejected (max 5)', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: [{ type: 'prize_lure', detail: '' }] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('empty signal detail rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: [{ type: 'prize_lure', detail: 'x'.repeat(501) }] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('over-long signal detail rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { explanation: 'x'.repeat(1001) })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('over-long explanation rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { recommendedAction: 'x'.repeat(301) })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('over-long recommended action rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: [] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('phishing assessment with no signals rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { assessment: 'safe', confidence: 'high', signals: [] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('high confidence with no signals rejected', op === null);
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { assessment: 'safe', confidence: 'medium', signals: [] })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('safe verdict with no signals accepted', op !== null && op.assessment === 'safe');
+  await close(m.srv);
+
+  m = await startMock((req, res) => jsonRes(res, Object.assign({}, GOOD, { signals: ['prize_lure', 'manufactured_urgency', 'impersonation', 'credential_request', 'suspicious_link'].map(sig) })));
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('5 distinct signals accepted', op !== null && op.signals.length === 5);
+  await close(m.srv);
+
   m = await startMock((req, res) => { setTimeout(() => jsonRes(res, GOOD), 400); });
   op = await getAiOpinion('x', ENGINE, { baseUrl: m.url, timeoutMs: 50 });
   check('timeout -> null', op === null);

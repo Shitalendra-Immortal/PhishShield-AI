@@ -42,5 +42,30 @@ check('do-not-share phrase adds no points',
 check('no negative-point reasons exist',
   !withPhrase.reasons.some(function (r) { return r.points < 0; }), withPhrase.reasons);
 
+// HTTPS detection: plain http scores the No-HTTPS point, https does not.
+// (A review claimed this condition could never fire; it fires exactly
+// for http URLs, and the clearer http-only form above keeps that.)
+const httpUrl = analyzeUrl('http://example.com/login');
+const httpsUrl = analyzeUrl('https://example.com/login');
+check('http URL gets the No-HTTPS reason',
+  httpUrl.reasons.some(function (r) { return r.label === 'No HTTPS encryption'; }), httpUrl.reasons);
+check('https URL gets no No-HTTPS reason',
+  !httpsUrl.reasons.some(function (r) { return r.label === 'No HTTPS encryption'; }), httpsUrl.reasons);
+
+// Corroboration: a lone weak signal scores 0; two weak signals together
+// score; a weak signal alongside a stronger one scores as before.
+const loneWord = analyzeUrl('https://example.com/login');
+check('lone pressure word scores 0',
+  loneWord.score === 0 && loneWord.reasons.length === 0, loneWord);
+const loneTld = analyzeUrl('https://example.xyz/');
+check('lone suspicious TLD scores 0',
+  loneTld.score === 0 && loneTld.reasons.length === 0, loneTld);
+const weakPair = analyzeUrl('https://example.xyz/login');
+check('pressure word + suspicious TLD together score 23',
+  weakPair.score === 23, weakPair);
+const corroborated = analyzeUrl('http://secure-update-verify.xyz/login');
+check('corroborated scam URL still scores 43',
+  corroborated.score === 43, corroborated);
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed.');
 process.exit(failed ? 1 : 0);
