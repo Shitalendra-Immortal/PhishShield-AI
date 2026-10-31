@@ -4,13 +4,13 @@ import type { RiskLevel, ScanResult } from "../types";
 import { Button, Eyebrow, RiskPill, TYPE_LABEL, formatDate, preview } from "../components/ui";
 import { cn } from "../utils/cn";
 
-type Filter = "all" | RiskLevel;
+type Filter = "all" | "phishing" | "suspicious" | "safe";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "high", label: "High risk" },
+  { id: "phishing", label: "Phishing" },
   { id: "suspicious", label: "Suspicious" },
-  { id: "low", label: "Low risk" },
+  { id: "safe", label: "Safe" },
 ];
 
 export function History({
@@ -29,10 +29,14 @@ export function History({
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return history.filter(
-      (s) =>
-        (filter === "all" || s.level === filter) && (!q || s.input.toLowerCase().includes(q)),
-    );
+    return history.filter((s) => {
+      const matchesLevel =
+        filter === "all" ||
+        (filter === "phishing" && (s.level === "phishing" || s.level === "high")) ||
+        (filter === "suspicious" && s.level === "suspicious") ||
+        (filter === "safe" && (s.level === "safe" || s.level === "low"));
+      return matchesLevel && (!q || s.input.toLowerCase().includes(q));
+    });
   }, [history, filter, query]);
 
   return (

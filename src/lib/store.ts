@@ -94,7 +94,7 @@ export function useHistory(enabled: boolean) {
 
 export const stats = (history: ScanResult[]) => ({
   total: history.length,
-  threats: history.filter((s) => s.level === "high").length,
+  threats: history.filter((s) => s.level === "phishing" || s.level === "high").length,
   suspicious: history.filter((s) => s.level === "suspicious").length,
-  safe: history.filter((s) => s.level === "low").length,
+  safe: history.filter((s) => s.level === "safe" || s.level === "low").length,
 });

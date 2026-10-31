@@ -125,8 +125,8 @@ function Drawer({
 
         <div className="mt-7 space-y-6 text-[0.93rem] leading-relaxed text-muted">
           <p>
-            Every submission is examined by a deterministic engine running inside your browser. There
-            is no upload, no account and no third-party request.
+            Submissions are analyzed in memory by the PhishShield AI API. Inputs are never stored,
+            persisted, or shared.
           </p>
           <div className="space-y-4">
             {[
@@ -279,8 +279,7 @@ export function AppShell({
         <div className="flex flex-col gap-4 border-t border-line-soft pt-8 text-[0.84rem] text-muted sm:flex-row sm:items-center sm:justify-between">
           <p className="font-display tracking-[-0.02em] text-cream/80">PhishShield</p>
           <p className="max-w-md leading-relaxed">
-            Analysis runs entirely in your browser. Nothing you paste is uploaded or stored on a
-            server.
+            Analysis is processed securely in memory by PhishShield AI API. Nothing you paste is stored on a server.
           </p>
           <button
             type="button"

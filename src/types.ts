@@ -1,46 +1,39 @@
 /**
  * PhishShield — shared domain types.
- * These types are consumed by the detection engine, the history store and the UI.
+ * These types are consumed by the API client, detection engine, history store, and UI.
  */
 
 export type ScanType = "message" | "email" | "url";
 
-export type RiskLevel = "low" | "suspicious" | "high";
+export type RiskLevel = "safe" | "suspicious" | "phishing" | "low" | "high";
 
 export type Severity = "info" | "low" | "medium" | "high";
 
-export type FindingCategory =
-  | "urgency"
-  | "credentials"
-  | "impersonation"
-  | "url"
-  | "intimidation"
-  | "reward"
-  | "payment"
-  | "sender"
-  | "greeting"
-  | "secrecy"
-  | "attachment"
-  | "obfuscation";
+export interface AnalyzeReason {
+  label: string;
+  detail: string;
+  points: number;
+}
 
-/** A character span inside the submitted content. */
+export interface ThreatIntel {
+  status: "listed" | "clean" | "unknown";
+  threat: string | null;
+}
+
 export interface Span {
   start: number;
   end: number;
   text: string;
 }
 
-/** One triggered detection rule, aggregated across all of its matches. */
 export interface Finding {
   id: string;
-  category: FindingCategory;
+  category: string;
   title: string;
   detail: string;
   severity: Severity;
-  /** Contribution to the raw risk total before normalisation. */
   weight: number;
   matches: Span[];
-  /** Non-textual evidence (hostnames, header values, …). */
   notes: string[];
 }
 
@@ -61,11 +54,10 @@ export interface UrlVerdict {
   trusted: boolean;
 }
 
-/** Merged, de-overlapped span used to highlight the evidence panel. */
 export interface Highlight {
   start: number;
   end: number;
-  category: FindingCategory;
+  category: string;
   severity: Severity;
   label: string;
 }
@@ -79,13 +71,19 @@ export interface ScanResult {
   score: number;
   level: RiskLevel;
   verdict: string;
-  summary: string;
-  findings: Finding[];
-  urls: UrlVerdict[];
-  highlights: Highlight[];
-  recommendations: string[];
-  /** Confidence in the assessment, derived from signal density. */
-  confidence: number;
+  advice: string;
+  reasons: AnalyzeReason[];
+  host?: string;
+  urls?: string[];
+  note?: string | null;
+  redirectChain?: string[];
+  finalUrl?: string | null;
+  threatIntel?: ThreatIntel;
+  summary?: string;
+  findings?: Finding[];
+  highlights?: Highlight[];
+  recommendations?: string[];
+  confidence?: number;
 }
 
 export type Sensitivity = "balanced" | "strict";

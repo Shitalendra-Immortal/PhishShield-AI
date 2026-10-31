@@ -41,8 +41,8 @@ export function Overview({
   onOpenScan: (scan: ScanResult) => void;
 }) {
   const total = history.length;
-  const threats = history.filter((s) => s.level === "high").length;
-  const safe = history.filter((s) => s.level === "low").length;
+  const threats = history.filter((s) => s.level === "phishing" || s.level === "high").length;
+  const safe = history.filter((s) => s.level === "safe" || s.level === "low").length;
   const recent = history.slice(0, 5);
 
   return (

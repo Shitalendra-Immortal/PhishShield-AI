@@ -4,7 +4,7 @@ import { Overview } from "./pages/Overview";
 import { Scanner } from "./pages/Scanner";
 import { Result } from "./pages/Result";
 import { History } from "./pages/History";
-import { analyze } from "./engine/analyze";
+import { analyzeInput } from "./lib/api";
 import { useHistory, useSettings } from "./lib/store";
 import type { ScanResult, ScanType } from "./types";
 
@@ -25,13 +25,32 @@ export default function App() {
   }, []);
 
   const runScan = useCallback(
-    (input: string, type: ScanType) => {
-      const result = analyze(input, type, { sensitivity: settings.sensitivity });
-      add(result);
-      setActive(result);
+    async (input: string, type: ScanType) => {
+      const mode = type === "url" ? "url" : "message";
+      const apiRes = await analyzeInput(input, mode);
+      const scan: ScanResult = {
+        id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type,
+        input,
+        createdAt: Date.now(),
+        score: apiRes.score,
+        level: apiRes.verdict.level,
+        verdict: apiRes.verdict.label,
+        advice: apiRes.verdict.advice,
+        reasons: apiRes.reasons || [],
+        host: apiRes.host,
+        urls: apiRes.urls,
+        note: apiRes.note,
+        redirectChain: apiRes.redirectChain,
+        finalUrl: apiRes.finalUrl,
+        threatIntel: apiRes.threatIntel,
+      };
+
+      add(scan);
+      setActive(scan);
       setView("result");
     },
-    [add, settings.sensitivity],
+    [add],
   );
 
   const openScan = useCallback((scan: ScanResult) => {

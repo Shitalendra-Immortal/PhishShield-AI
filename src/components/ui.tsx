@@ -116,8 +116,16 @@ export const RISK_STYLES: Record<
   RiskLevel,
   { label: string; text: string; bg: string; border: string; dot: string; bar: string }
 > = {
+  safe: {
+    label: "Looks Safe",
+    text: "text-safe",
+    bg: "bg-safe/10",
+    border: "border-safe/25",
+    dot: "bg-safe",
+    bar: "from-safe/80 to-safe/40",
+  },
   low: {
-    label: "Low risk",
+    label: "Looks Safe",
     text: "text-safe",
     bg: "bg-safe/10",
     border: "border-safe/25",
@@ -132,8 +140,16 @@ export const RISK_STYLES: Record<
     dot: "bg-warn",
     bar: "from-warn to-peach",
   },
+  phishing: {
+    label: "Likely Phishing",
+    text: "text-danger",
+    bg: "bg-danger/12",
+    border: "border-danger/30",
+    dot: "bg-danger",
+    bar: "from-danger to-ember",
+  },
   high: {
-    label: "High risk",
+    label: "Likely Phishing",
     text: "text-danger",
     bg: "bg-danger/12",
     border: "border-danger/30",

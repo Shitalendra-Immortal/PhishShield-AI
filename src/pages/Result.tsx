@@ -1,12 +1,21 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, Copy, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  Info,
+  Route,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import type { Highlight, ScanResult, Severity } from "../types";
 import {
   Button,
   Eyebrow,
   RISK_STYLES,
   RiskPill,
-  SEVERITY_COLOR,
   TYPE_LABEL,
   formatDate,
   formatTime,
@@ -14,9 +23,11 @@ import {
 import { cn } from "../utils/cn";
 
 const GLOW: Record<ScanResult["level"], string> = {
-  high: "rgba(232,80,60,0.34)",
-  suspicious: "rgba(240,162,75,0.26)",
+  safe: "rgba(127,185,138,0.18)",
   low: "rgba(127,185,138,0.18)",
+  suspicious: "rgba(240,162,75,0.26)",
+  phishing: "rgba(232,80,60,0.34)",
+  high: "rgba(232,80,60,0.34)",
 };
 
 const MARK_STYLE: Record<Severity, string> = {
@@ -26,7 +37,10 @@ const MARK_STYLE: Record<Severity, string> = {
   high: "bg-danger/18 text-[#FF9B88] decoration-danger/60",
 };
 
-function renderEvidence(input: string, highlights: Highlight[]): ReactNode[] {
+function renderEvidence(input: string, highlights?: Highlight[]): ReactNode[] {
+  if (!highlights || highlights.length === 0) {
+    return [<span>{input}</span>];
+  }
   const nodes: ReactNode[] = [];
   let cursor = 0;
   highlights.forEach((h, i) => {
@@ -52,17 +66,49 @@ function renderEvidence(input: string, highlights: Highlight[]): ReactNode[] {
 function reportText(scan: ScanResult): string {
   const lines = [
     `PhishShield assessment — ${scan.verdict}`,
-    `Risk score: ${scan.score}/100 (${RISK_STYLES[scan.level].label})`,
+    `Risk score: ${scan.score}/100 (${RISK_STYLES[scan.level]?.label || scan.level})`,
     `Type: ${TYPE_LABEL[scan.type]} · ${formatDate(scan.createdAt)} ${formatTime(scan.createdAt)}`,
     "",
-    "What we detected:",
-    ...(scan.findings.length
-      ? scan.findings.map((f) => `- ${f.title}: ${f.detail}`)
-      : ["- No phishing patterns matched."]),
-    "",
-    "Recommended action:",
-    ...scan.recommendations.map((r, i) => `${i + 1}. ${r}`),
   ];
+
+  if (scan.note) {
+    lines.push(`Note: ${scan.note}`, "");
+  }
+
+  if (scan.finalUrl) {
+    lines.push(`Final Destination: ${scan.finalUrl}`, "");
+  }
+
+  if (scan.threatIntel && scan.threatIntel.status !== "unknown") {
+    lines.push(
+      `Threat Intel (URLhaus): ${scan.threatIntel.status}${
+        scan.threatIntel.threat ? ` (${scan.threatIntel.threat})` : ""
+      }`,
+      "",
+    );
+  }
+
+  lines.push("What we detected:");
+  if (scan.reasons && scan.reasons.length > 0) {
+    scan.reasons.forEach((r) => {
+      const pts = r.points > 0 ? `+${r.points}` : `${r.points}`;
+      lines.push(`- ${r.label} (${pts} pts): ${r.detail}`);
+    });
+  } else if (scan.findings && scan.findings.length > 0) {
+    scan.findings.forEach((f) => {
+      lines.push(`- ${f.title}: ${f.detail}`);
+    });
+  } else {
+    lines.push("- No phishing signals detected.");
+  }
+
+  lines.push("", "Recommended action:");
+  if (scan.advice) {
+    lines.push(scan.advice);
+  } else if (scan.recommendations && scan.recommendations.length > 0) {
+    scan.recommendations.forEach((r, i) => lines.push(`${i + 1}. ${r}`));
+  }
+
   return lines.join("\n");
 }
 
@@ -77,7 +123,7 @@ export function Result({
 }) {
   const [copied, setCopied] = useState(false);
   const evidence = useMemo(() => renderEvidence(scan.input, scan.highlights), [scan]);
-  const style = RISK_STYLES[scan.level];
+  const style = RISK_STYLES[scan.level] || RISK_STYLES.safe;
 
   const copy = async () => {
     try {
@@ -88,6 +134,9 @@ export function Result({
       setCopied(false);
     }
   };
+
+  const hasReasons = scan.reasons && scan.reasons.length > 0;
+  const hasLegacyFindings = scan.findings && scan.findings.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 animate-rise">
@@ -105,7 +154,7 @@ export function Result({
         <div
           aria-hidden
           className="pointer-events-none absolute -right-28 -top-40 h-[30rem] w-[30rem] rounded-full blur-[110px]"
-          style={{ background: `radial-gradient(circle, ${GLOW[scan.level]}, transparent 68%)` }}
+          style={{ background: `radial-gradient(circle, ${GLOW[scan.level] || GLOW.safe}, transparent 68%)` }}
         />
         <div className="absolute inset-x-0 top-0 h-px hairline-top" />
 
@@ -117,18 +166,61 @@ export function Result({
               <span className="text-[0.76rem] uppercase tracking-[0.2em] text-muted">
                 {TYPE_LABEL[scan.type]}
               </span>
+              {scan.host && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-muted/50" />
+                  <span className="font-mono text-[0.76rem] text-muted">{scan.host}</span>
+                </>
+              )}
             </div>
+
             <h1 className="mt-5 font-display text-[2.1rem] font-semibold leading-[1.02] tracking-[-0.04em] text-cream sm:text-[3rem]">
               {scan.verdict}
             </h1>
-            <p className="mt-5 text-[1rem] leading-[1.75] text-muted">{scan.summary}</p>
+
+            {scan.summary && (
+              <p className="mt-4 text-[1rem] leading-[1.75] text-muted">{scan.summary}</p>
+            )}
+
+            {/* Note badge / card */}
+            {scan.note && (
+              <div className="mt-5 flex items-start gap-3 rounded-2xl border border-peach/25 bg-peach/10 p-4 text-[0.92rem] text-peach">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <span className="font-medium text-cream">Note: </span>
+                  {scan.note}
+                </div>
+              </div>
+            )}
+
+            {/* Threat Intel Pill / Card */}
+            {scan.threatIntel && (
+              <div className="mt-4">
+                {scan.threatIntel.status === "listed" && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-danger/35 bg-danger/15 px-3.5 py-2 text-[0.84rem] text-[#FF9B88]">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-danger" />
+                    <span>
+                      <strong>URLhaus Alert:</strong> Listed in malicious URL database
+                      {scan.threatIntel.threat ? ` (${scan.threatIntel.threat})` : ""}.
+                    </span>
+                  </div>
+                )}
+                {scan.threatIntel.status === "clean" && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-safe/30 bg-safe/10 px-3.5 py-2 text-[0.84rem] text-safe">
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
+                    <span>
+                      <strong>Threat Intel:</strong> Checked against abuse.ch URLhaus (clean).
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-7 flex flex-wrap items-center gap-3 text-[0.8rem] text-muted">
               <RiskPill level={scan.level} />
               <span>
                 {formatDate(scan.createdAt)} · {formatTime(scan.createdAt)}
               </span>
-              <span className="h-1 w-1 rounded-full bg-muted/50" />
-              <span>Confidence {scan.confidence}%</span>
             </div>
           </div>
 
@@ -153,74 +245,129 @@ export function Result({
               />
             </div>
             <div className="mt-2.5 flex justify-between font-mono text-[0.68rem] uppercase tracking-[0.14em] text-muted/70">
-              <span>Low</span>
-              <span>Suspicious</span>
-              <span>High</span>
+              <span>Safe (0–29)</span>
+              <span>Suspicious (30–59)</span>
+              <span>Phishing (60–100)</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* A — What we detected */}
+      {/* Redirect Chain & Final Destination (when present) */}
+      {scan.redirectChain && scan.redirectChain.length > 0 && (
+        <section className="overflow-hidden rounded-[28px] border border-line bg-ink-2/60 backdrop-blur-xl">
+          <header className="flex items-center gap-2.5 px-6 py-4 border-b border-line-soft sm:px-8">
+            <Route className="h-4 w-4 text-peach" />
+            <h2 className="font-display text-[1.1rem] tracking-[-0.02em] text-cream">
+              Redirect Analysis &amp; Destination
+            </h2>
+          </header>
+          <div className="p-6 sm:p-8 space-y-4">
+            <p className="text-[0.88rem] text-muted leading-relaxed">
+              Link shorteners conceal where links go. PhishShield followed the redirection chain:
+            </p>
+            <ol className="space-y-3 font-mono text-[0.84rem]">
+              {scan.redirectChain.map((url, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3 rounded-xl border border-line-soft bg-white/[0.02] p-3 text-cream/90 break-all"
+                >
+                  <span className="rounded bg-white/10 px-2 py-0.5 text-[0.74rem] text-muted shrink-0">
+                    {i === 0 ? "Short URL" : `Hop ${i}`}
+                  </span>
+                  <span>{url}</span>
+                </li>
+              ))}
+              {scan.finalUrl && (
+                <li className="flex items-start gap-3 rounded-xl border border-peach/30 bg-peach/10 p-3.5 text-cream break-all font-semibold">
+                  <span className="rounded bg-flame-gradient px-2 py-0.5 text-[0.74rem] text-[#1B1011] shrink-0 font-sans font-bold">
+                    Destination
+                  </span>
+                  <span className="flex-1">{scan.finalUrl}</span>
+                </li>
+              )}
+            </ol>
+          </div>
+        </section>
+      )}
+
+      {/* What we detected / Analysis reasons */}
       <section className="overflow-hidden rounded-[28px] border border-line bg-ink-2/50 backdrop-blur-xl">
         <header className="flex items-baseline justify-between gap-4 px-6 py-5 sm:px-8">
           <h2 className="font-display text-[1.15rem] tracking-[-0.02em] text-cream">
             What we detected
           </h2>
           <span className="font-mono text-[0.76rem] text-muted">
-            {scan.findings.length} signal{scan.findings.length === 1 ? "" : "s"}
+            {hasReasons
+              ? `${scan.reasons.length} signal${scan.reasons.length === 1 ? "" : "s"}`
+              : hasLegacyFindings
+              ? `${scan.findings!.length} signal${scan.findings!.length === 1 ? "" : "s"}`
+              : "0 signals"}
           </span>
         </header>
 
-        {scan.findings.length === 0 ? (
+        {!hasReasons && !hasLegacyFindings ? (
           <p className="border-t border-line-soft px-6 py-8 text-[0.95rem] leading-relaxed text-muted sm:px-8">
-            No rule in the detection set matched this content. That is not a guarantee of safety —
-            verify unexpected requests through a channel you already trust.
+            No phishing signals found. That is not a guarantee of absolute safety — always verify
+            sensitive requests before entering passwords or approving transactions.
           </p>
         ) : (
           <ul className="border-t border-line-soft">
-            {scan.findings.map((f) => (
-              <li
-                key={f.id}
-                className="flex gap-4 border-b border-line-soft px-6 py-5 last:border-b-0 sm:px-8"
-              >
-                <span
-                  className={cn("mt-[0.55rem] h-2 w-2 shrink-0 rounded-full", SEVERITY_COLOR[f.severity])}
-                />
-                <div className="min-w-0">
-                  <p className="font-display text-[1rem] tracking-[-0.015em] text-cream">{f.title}</p>
-                  <p className="mt-1.5 text-[0.92rem] leading-relaxed text-muted">{f.detail}</p>
-                  {f.notes.length > 0 && (
-                    <ul className="mt-2.5 space-y-1">
-                      {f.notes.slice(0, 4).map((note, i) => (
-                        <li key={i} className="text-[0.84rem] leading-relaxed text-muted/85">
-                          <span className="mr-2 text-peach/70">—</span>
-                          {note}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {f.matches.length > 0 && (
-                    <p className="mt-2.5 font-mono text-[0.78rem] leading-relaxed text-peach/80">
-                      {f.matches
-                        .slice(0, 3)
-                        .map((m) => `“${m.text.trim()}”`)
-                        .join("  ")}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
+            {hasReasons
+              ? scan.reasons.map((r, i) => {
+                  const isPositive = r.points > 0;
+                  const isNegative = r.points < 0;
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-start justify-between gap-4 border-b border-line-soft px-6 py-5 last:border-b-0 sm:px-8"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-display text-[1rem] tracking-[-0.015em] text-cream">
+                            {r.label}
+                          </p>
+                        </div>
+                        <p className="mt-1.5 text-[0.92rem] leading-relaxed text-muted">
+                          {r.detail}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 font-mono text-[0.82rem] font-semibold px-2.5 py-1 rounded-full",
+                          isPositive && "bg-danger/15 text-danger border border-danger/30",
+                          isNegative && "bg-safe/15 text-safe border border-safe/30",
+                          !isPositive && !isNegative && "bg-white/10 text-muted border border-white/10",
+                        )}
+                      >
+                        {isPositive ? `+${r.points} pts` : isNegative ? `${r.points} pts` : "info"}
+                      </span>
+                    </li>
+                  );
+                })
+              : scan.findings!.map((f) => (
+                  <li
+                    key={f.id}
+                    className="flex gap-4 border-b border-line-soft px-6 py-5 last:border-b-0 sm:px-8"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-display text-[1rem] tracking-[-0.015em] text-cream">{f.title}</p>
+                      <p className="mt-1.5 text-[0.92rem] leading-relaxed text-muted">{f.detail}</p>
+                    </div>
+                  </li>
+                ))}
           </ul>
         )}
       </section>
 
-      {/* B — Evidence */}
+      {/* Evidence / Content inspected */}
       <section className="overflow-hidden rounded-[28px] border border-line bg-card/50 backdrop-blur-xl">
         <header className="flex items-baseline justify-between gap-4 px-6 py-5 sm:px-8">
-          <h2 className="font-display text-[1.15rem] tracking-[-0.02em] text-cream">Evidence</h2>
-          {scan.highlights.length > 0 && (
-            <span className="text-[0.78rem] text-muted">Highlighted phrases triggered a rule</span>
+          <h2 className="font-display text-[1.15rem] tracking-[-0.02em] text-cream">Submitted Content</h2>
+          {scan.type === "url" && (
+            <span className="text-[0.78rem] text-muted flex items-center gap-1">
+              <ExternalLink className="h-3 w-3" /> Exact URL inspected
+            </span>
           )}
         </header>
 
@@ -234,35 +381,28 @@ export function Result({
             {evidence}
           </div>
 
-          {scan.urls.length > 0 && (
+          {scan.urls && scan.urls.length > 0 && (
             <div className="mt-6">
-              <p className="text-[0.8rem] uppercase tracking-[0.2em] text-muted">Links found</p>
-              <ul className="mt-3 space-y-2">
-                {scan.urls.map((u, i) => (
-                  <li
-                    key={`${u.raw}-${i}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-soft bg-white/[0.02] px-4 py-3"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-mono text-[0.84rem] text-cream/85">
-                        {u.raw}
-                      </span>
-                      <span className="mt-1 block text-[0.78rem] text-muted">
-                        Resolves to {u.registrable || u.host || "an unknown host"}
-                        {u.signals.filter((s) => s.weight > 0).length > 0 &&
-                          ` · ${u.signals.filter((s) => s.weight > 0).length} structural flag(s)`}
-                      </span>
-                    </span>
-                    <RiskPill level={u.level} />
-                  </li>
-                ))}
+              <p className="text-[0.8rem] uppercase tracking-[0.2em] text-muted">Links found in content</p>
+              <ul className="mt-3 space-y-2 font-mono text-[0.84rem]">
+                {scan.urls.map((u, i) => {
+                  const urlText = typeof u === "string" ? u : u.raw;
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-white/[0.02] px-4 py-3"
+                    >
+                      <span className="truncate text-cream/85">{urlText}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
         </div>
       </section>
 
-      {/* C — Recommended action */}
+      {/* Recommended action (verbatim advice from backend) */}
       <section className="relative overflow-hidden rounded-[28px] border border-line bg-ink-2/60 backdrop-blur-xl">
         <div
           aria-hidden
@@ -270,22 +410,14 @@ export function Result({
         />
         <header className="relative px-6 py-5 sm:px-8">
           <h2 className="font-display text-[1.15rem] tracking-[-0.02em] text-cream">
-            Recommended action
+            Recommended Action
           </h2>
         </header>
-        <ol className="relative border-t border-line-soft">
-          {scan.recommendations.map((rec, i) => (
-            <li
-              key={i}
-              className="flex gap-5 border-b border-line-soft px-6 py-5 last:border-b-0 sm:px-8"
-            >
-              <span className="font-mono text-[0.8rem] text-peach/80 tabular-nums">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <p className="text-[0.95rem] leading-relaxed text-cream/85">{rec}</p>
-            </li>
-          ))}
-        </ol>
+        <div className="relative border-t border-line-soft px-6 py-6 sm:px-8">
+          <p className="text-[1.02rem] leading-relaxed text-cream/90">
+            {scan.advice || "No specific action required. Continue to follow standard security practices."}
+          </p>
+        </div>
       </section>
 
       <div className="flex flex-wrap items-center gap-3 pb-2">
