@@ -79,6 +79,7 @@ borderline-only gating).
 | `URLHAUS_ENABLED` | `1` | Set `0` to disable URLhaus lookups (deterministic tests). |
 | `URLHAUS_API_URL` | `https://urlhaus-api.abuse.ch/v1/url/` | Override for tests (point at a mock server). |
 | `URLHAUS_AUTH_KEY` | (none) | Free Auth-Key from abuse.ch (auth.abuse.ch). Required for URLhaus lookups; without it lookups report `unknown`. Never commit a real key — set it in Render's dashboard env vars. |
+| `URLHAUS_CACHE_TTL_MS` | `1800000` (30 min) | How long definitive URLhaus results (listed/clean) stay cached in memory. `unknown` results are never cached. |
 | `AI_SERVICE_URL` | (none) | Base URL of Member 3's AI service (e.g. its Render URL). Unset = AI second opinion disabled, no `ai` field. |
 | `AI_TIMEOUT_MS` | `8000` | Timeout for the AI service call; on timeout the `ai` field is omitted. |
 | `AI_SERVICE_KEY` | (none) | Shared secret sent as `X-AI-Service-Key` to the AI service. Set the same value on the AI service and the backend; unset = no header sent. |
@@ -104,7 +105,7 @@ server.js       Express app: routes, validation, CORS, error mapping
 analyzer.js     Heuristic engine (identical to the browser draft — do not fork it)
 rateLimit.js    In-memory rate limiter for /api/analyze
 redirect.js     Redirect-chain follower with SSRF guards
-urlhaus.js      URLhaus (abuse.ch) lookup, best-effort
+urlhaus.js      URLhaus (abuse.ch) lookup, best-effort, in-memory cache for definitive results
 ai.js           AI second-opinion client (borderline-only, env-gated, fail-open)
 package.json    Express dependency + start script
 tests/          Contract + engine + unit tests
@@ -120,13 +121,27 @@ Implemented and demonstrated with tests + live Render checks:
 - Error handling + validation (MISSING_INPUT, INVALID_TYPE, INPUT_TOO_LONG,
   INVALID_JSON, NOT_FOUND; enrichments never break the base verdict)
 - Timeouts: redirect 5s, URLhaus 5s, AI service 8s
+- No score deduction for reassuring phrases: a "do not share" warning earns
+  zero points, since scammers copy such phrases to shave their own score
+- URL normalisation: trailing dots stripped, percent-encoded hosts decoded,
+  default ports (:443/:80) not flagged as unusual
+- URLhaus result cache: definitive listed/clean results cached in memory
+  (30 min TTL, 1000 entries); unknown results never cached
+- Structured request logs: one JSON line per request (method, path, status,
+  duration, score band). Inputs, URLs, hosts, headers, and IPs are never logged
 - AI second-opinion wiring (borderline engine scores 30–59 only, additive
   `ai` field, engine verdict never changed) — code + mock tests done
 
 Still pending (deployment/coordination steps, not code gaps):
-- AI service deployment (separate Render service + Member 3's GEMINI_API_KEY)
-- Live AI integration check once the AI service URL exists (set
-  AI_SERVICE_URL on the backend Render service)
+- AI service deployed 2026-10-31 (Render, `ai-service/` root) and backend
+  integration verified live: borderline scans gain the `ai` field, safe and
+  phishing scans do not
+- Restrictive CORS: still open origin for the demo; tightening needs the
+  Vercel frontend URL, which is not yet recorded
+- Uptime monitoring: nothing watches the Render services yet
+- Frontend AI second-opinion panel (Member 1): backend returns `ai`, the
+  Result page does not render it yet
+- Labelled dataset + precision/recall/F1 (Member 4's deferred corpus work)
 - Frontend rendering of the `ai` second-opinion panel (Member 1)
 - Live 429 demonstration from a single fixed IP (this VM's egress IPs rotate,
   so the loop never tripped the limiter; local rate-limit tests pass 9/9)

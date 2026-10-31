@@ -54,7 +54,13 @@
   function hostOf(url) {
     try {
       var u = url.match(/^https?:\/\//i) ? url : 'https://' + url;
-      return new URL(u).hostname.toLowerCase();
+      var h = new URL(u).hostname.toLowerCase();
+      // Normalise before any check runs on it: a trailing dot and a
+      // percent-encoded host are the same domain, and must not dodge
+      // official-domain or brand matching.
+      h = h.replace(/\.+$/, '');
+      try { h = decodeURIComponent(h); } catch (e) { /* keep raw host */ }
+      return h;
     } catch (e) { return ''; }
   }
 
@@ -160,7 +166,11 @@
       hit(10, 'No HTTPS encryption',
         'Login and payment pages without HTTPS expose anything you type.');
     }
-    if (/:\d+(\/|$|\?)/.test(url.replace(/^https?:\/\//i, ''))) {
+    // WHATWG URL already drops default ports (:443 on https, :80 on http)
+    // from .port, so only a real non-default port scores here.
+    var port = '';
+    try { port = new URL(url.match(/^https?:\/\//i) ? url : 'https://' + url).port; } catch (e) { port = ''; }
+    if (port) {
       hit(10, 'Unusual port number in the URL',
         'Legitimate public sites almost never put a port in their address.');
     }
@@ -273,12 +283,10 @@
       }
     }
 
-    // Good signal: explicitly warning never to share credentials.
-    if (/do not share/.test(lower)) {
-      score = Math.max(0, score - 10);
-      reasons.push({ label: 'Good signal: warns you never to share credentials',
-        detail: 'Legitimate messages say this. Scam messages do the opposite.', points: -10 });
-    }
+    // NOTE: a "do not share" warning earns NO deduction. Scammers copy
+    // reassuring phrases ("do not share your OTP with anyone...") to shave
+    // points off their own message, so the phrase is not evidence either
+    // way. Legitimate warnings already score low on their own merits.
     return { score: score, reasons: reasons, urls: urls };
   }
 

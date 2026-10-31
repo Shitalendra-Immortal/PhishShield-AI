@@ -38,6 +38,28 @@ const SAMPLES = [
 
 const app = express();
 
+// Structured request logs, registered first so every request is logged
+// even when body parsing fails. Deliberately minimal: method, path,
+// status, duration, and (for analyze) the score band only. NEVER the input
+// text, URLs, hosts, headers, or IPs — submitted links can carry private
+// tokens, and log lines must stay safe to paste into a chat or ticket.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const entry = {
+      ts: new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      durationMs: Date.now() - start
+    };
+    if (res.locals.log) Object.assign(entry, res.locals.log);
+    if (res.locals.errorCode) entry.error = res.locals.errorCode;
+    console.log(JSON.stringify(entry));
+  });
+  next();
+});
+
 // Behind Render's proxy, so client IPs (for rate limiting) come from
 // X-Forwarded-For. Demo scope: a spoofed header only changes which bucket
 // a client counts against.
@@ -62,6 +84,7 @@ app.use('/api/analyze', createRateLimiter({
 }));
 
 function sendError(res, status, code, message) {
+  res.locals.errorCode = code;
   return res.status(status).json({ error: { code, message } });
 }
 
@@ -201,6 +224,12 @@ app.post('/api/analyze', async (req, res) => {
       // AI is never on the critical path.
     }
   }
+  res.locals.log = {
+    level: result.verdict.level,
+    score: result.score,
+    threatIntel: result.threatIntel ? result.threatIntel.status : undefined,
+    ai: !!result.ai
+  };
   return res.json(result);
 });
 
