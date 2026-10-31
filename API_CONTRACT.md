@@ -20,7 +20,9 @@ in v1. Inputs are analyzed in memory and **never stored**.
 - All requests and responses are JSON. `Content-Type: application/json`.
 - CORS: `Access-Control-Allow-Origin: *` in v1 (hackathon demo only; tighten
   before any real deployment).
-- No rate limiting in v1. No auth in v1.
+- Rate limiting: 100 requests per 15 minutes per IP on `POST /api/analyze`
+  only (generous demo limit; exceeding it returns 429 `RATE_LIMITED` with a
+  `Retry-After` header). No auth in v1.
 - Breaking changes go to `/api/v2`, never by silently changing v1.
 
 ---
@@ -109,6 +111,9 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
 | `host` | string | URL mode only: the analyzed hostname, e.g. `"secure-update-verify.xyz"`. |
 | `urls` | string[] | Message mode only: URLs found inside the message (max 3 analyzed, highest link score used). |
 | `note` | string or null | Extra context when present, e.g. `"Official domain of Amazon India."` for exact official domains (score 0), or `"No valid URL found."`. Display it when non-null. |
+| `redirectChain` | string[] | URL mode only: every URL actually fetched while following a redirect chain, input first. `[]` when no redirect was followed (including when following was skipped or failed). |
+| `finalUrl` | string or null | URL mode only: the last fetched URL in the chain, or `null` when nothing was fetched. |
+| `threatIntel` | object | URL mode only: `{ status, threat }` where `status` is `"listed"` (URL appears in abuse.ch URLhaus), `"clean"` (checked, not listed), or `"unknown"` (lookup failed, skipped, or disabled); `threat` is the URLhaus threat type (e.g. `"malware_download"`) or `null`. |
 
 **Verdict bands (fixed in v1 — do not change without a contract update)**
 
@@ -128,6 +133,27 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
   at 40 points toward the message score. A "do not share credentials" warning in
   the text subtracts 10 (score never goes below 0).
 
+**URL-mode enrichment (backend-only, added 2026-10-31)**
+
+- **Redirect following:** when the input URL's host is a known link shortener,
+  the backend follows its redirect chain (max 5 hops, 5 second total timeout)
+  and analyzes the final destination. Destination signals not already present
+  are added to `reasons` with the prefix `"Redirect destination: "` and their
+  points added to the score (still capped at 100). `redirectChain` and
+  `finalUrl` report the chain. Private/loopback hosts are never fetched (SSRF
+  guard); a failed or blocked lookup leaves the base score untouched. Message
+  mode does not follow redirects.
+- **URLhaus lookup:** when the URL is not an exact official domain, the backend
+  checks the final destination (or the input URL, when no redirect ran)
+  against the abuse.ch URLhaus malicious-URL database (free, no API key). If
+  listed, a reason `"Listed in URLhaus malicious-URL database"` (+60 points) is
+  added, which forces the Phishing band. If the lookup fails or is skipped,
+  `threatIntel.status` is `"unknown"` and the base verdict stands. Message mode
+  does not run this lookup.
+- **Sender check (engine):** message mode now flags `"Brand"
+  <address@other-domain>` sender-name impersonation (+30 points, Suspicious
+  boundary on its own). A brand sender from its official domain is not flagged.
+
 **More real examples (engine output, for frontend test fixtures)**
 
 Suspicious URL — input `http://secure-update-verify.xyz/login` →
@@ -145,6 +171,7 @@ reasons `[]`, `host`: `"www.amazon.in"`, note: `"Official domain of Amazon India
 | 400 | `MISSING_INPUT` | `input` missing, not a string, or empty/whitespace-only. |
 | 400 | `INVALID_TYPE` | `type` is present but not `"auto"`, `"url"`, or `"message"`. |
 | 413 | `INPUT_TOO_LONG` | `input` longer than 5000 characters. |
+| 429 | `RATE_LIMITED` | More than 100 `/api/analyze` requests in 15 minutes from one IP. `Retry-After` header gives seconds until reset. |
 | 500 | `INTERNAL_ERROR` | Anything else goes wrong server-side. |
 
 Error body shape (all errors):
@@ -232,8 +259,10 @@ error are both "error" — show a retry, never a fake verdict).
 
 ## Out of scope for v1 (add only by contract update)
 
-- Fetching the destination page a link points to (backend would need a fetch
-  proxy; browser-only analysis covers URL + message text only).
+- Fetching and analyzing destination page *content* (redirect chains are
+  followed for shortener links, but page bodies are never fetched).
+- Full domain-age or domain-reputation lookups (URLhaus covers
+  known-malicious lists only).
 - Auth, accounts, saved history, or analytics.
 - `POST /api/analyze/batch` (multiple inputs at once).
 - A trained ML model layer (engine is heuristic scoring in v1).

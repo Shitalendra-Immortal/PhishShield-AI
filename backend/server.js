@@ -7,6 +7,9 @@
 
 const express = require('express');
 const PhishShield = require('./analyzer.js');
+const { createRateLimiter } = require('./rateLimit.js');
+const { followRedirects } = require('./redirect.js');
+const { lookupUrlhaus } = require('./urlhaus.js');
 
 const PORT = process.env.PORT || 3000;
 const MAX_INPUT = 5000;
@@ -34,6 +37,11 @@ const SAMPLES = [
 
 const app = express();
 
+// Behind Render's proxy, so client IPs (for rate limiting) come from
+// X-Forwarded-For. Demo scope: a spoofed header only changes which bucket
+// a client counts against.
+app.set('trust proxy', 1);
+
 // CORS first, so even parse errors carry the headers (v1 demo: open origin).
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -44,6 +52,13 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '100kb' }));
+
+// Rate limit on analyze only (health/samples stay unthrottled). Generous
+// defaults so normal demo use never trips it; override via env for tests.
+app.use('/api/analyze', createRateLimiter({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_MAX) || 100
+}));
 
 function sendError(res, status, code, message) {
   return res.status(status).json({ error: { code, message } });
@@ -57,7 +72,7 @@ app.get('/api/samples', (req, res) => {
   res.json({ samples: SAMPLES });
 });
 
-app.post('/api/analyze', (req, res) => {
+app.post('/api/analyze', async (req, res) => {
   const body = req.body || {};
   const input = body.input;
   const type = body.type === undefined ? 'auto' : body.type;
@@ -105,6 +120,64 @@ app.post('/api/analyze', (req, res) => {
     } else {
       result.urls = r.urls;
       result.note = r.note;
+    }
+  }
+
+  // URL-mode enrichment (additive only; never breaks the base verdict).
+  // Message mode gets no enrichment: short links inside messages are
+  // already capped at 40 points by the engine.
+  if (result.kind === 'url') {
+    result.redirectChain = [];
+    result.finalUrl = null;
+    result.threatIntel = { status: 'unknown', threat: null };
+    const official = result.note && result.note.indexOf('Official domain of') === 0;
+    const targetUrl = /^https?:\/\//i.test(input) ? input : 'https://' + input;
+    if (!official && result.host) {
+      try {
+        // Redirect following: shortener hosts only, SSRF-guarded, 5s total.
+        if (process.env.REDIRECT_ENABLED !== '0' && PhishShield.isShortener(result.host)) {
+          const red = await followRedirects(targetUrl, {
+            allowPrivate: process.env.REDIRECT_ALLOW_PRIVATE === '1'
+          });
+          result.redirectChain = red.chain;
+          result.finalUrl = red.finalUrl;
+          if (red.reachedFinal && red.chain.length > 1 && red.finalUrl && red.finalUrl !== targetUrl) {
+            const dest = PhishShield.analyzeUrl(red.finalUrl);
+            const seen = {};
+            result.reasons.forEach(function (r) { seen[r.label] = true; });
+            dest.reasons.forEach(function (r) {
+              if (!seen[r.label]) {
+                result.score += r.points;
+                result.reasons.push({
+                  label: 'Redirect destination: ' + r.label,
+                  detail: r.detail,
+                  points: r.points
+                });
+              }
+            });
+            result.score = Math.min(100, result.score);
+            result.verdict = PhishShield.verdictFor(result.score);
+          }
+        }
+        // URLhaus: keyless, best-effort. Listed => +60 (forces Phishing band).
+        // Any failure leaves the base verdict untouched.
+        if (process.env.URLHAUS_ENABLED !== '0') {
+          const intel = await lookupUrlhaus(result.finalUrl || targetUrl, {});
+          result.threatIntel = intel;
+          if (intel.status === 'listed') {
+            result.score = Math.min(100, result.score + 60);
+            result.reasons.push({
+              label: 'Listed in URLhaus malicious-URL database',
+              detail: 'This address appears in abuse.ch URLhaus' +
+                (intel.threat ? ' as threat type "' + intel.threat + '"' : '') + '.',
+              points: 60
+            });
+            result.verdict = PhishShield.verdictFor(result.score);
+          }
+        }
+      } catch (e) {
+        // Enrichment must never break the base verdict.
+      }
     }
   }
   return res.json(result);

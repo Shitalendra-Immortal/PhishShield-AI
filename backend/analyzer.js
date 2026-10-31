@@ -26,6 +26,19 @@
     'pnb', 'baroda', 'canara', 'unionbank', 'idfc', 'indusind', 'yesbank',
     'jio', 'airtel', 'aadhaar', 'epfo'];
 
+  // Display-name brands for the sender-mismatch check: brand key -> official domains.
+  var SENDER_BRANDS = {
+    'paypal': ['paypal.com'], 'sbi': ['sbi.co.in', 'onlinesbi.com'],
+    'hdfc': ['hdfcbank.com'], 'icici': ['icicibank.com'],
+    'axis': ['axisbank.com'], 'kotak': ['kotak.com'],
+    'paytm': ['paytm.com'], 'phonepe': ['phonepe.com'],
+    'google': ['google.com'], 'amazon': ['amazon.in', 'amazon.com'],
+    'apple': ['apple.com'], 'microsoft': ['microsoft.com'],
+    'netflix': ['netflix.com'], 'facebook': ['facebook.com'],
+    'instagram': ['instagram.com'], 'irctc': ['irctc.co.in'],
+    'flipkart': ['flipkart.com']
+  };
+
   var SHORTENERS = ['bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly',
     'is.gd', 'buff.ly', 'cutt.ly', 'shorte.st', 'rebrand.ly',
     'tiny.cc', 'bit.do', 'rb.gy', 't.ly', 'shorturl.at'];
@@ -72,6 +85,10 @@
       if (!seen[clean]) { seen[clean] = true; out.push(clean); }
     });
     return out;
+  }
+
+  function isShortenerHost(host) {
+    return SHORTENERS.indexOf(host.replace(/^www\./, '')) !== -1;
   }
 
   // URL-only checks. Returns { score, reasons: [{label, detail, points}] }.
@@ -216,6 +233,25 @@
       hit(10, 'Fake bank app download lure',
         'A money brand plus an app download push is a classic fake-app scam.');
     }
+    // Sender-name spoofing: "Brand Name <address@other-domain>".
+    var senderMatch = text.match(/"?([A-Za-z][A-Za-z ]{1,40})"?\s*<[^>\s]+@([^>\s]+)>/);
+    if (senderMatch) {
+      var display = senderMatch[1].toLowerCase();
+      var senderDomain = senderMatch[2].toLowerCase().replace(/>$/, '');
+      var spoofed = null;
+      Object.keys(SENDER_BRANDS).forEach(function (b) {
+        if (!spoofed && display.indexOf(b) !== -1) {
+          var official = SENDER_BRANDS[b].some(function (d) {
+            return senderDomain === d || senderDomain.endsWith('.' + d);
+          });
+          if (!official) spoofed = b;
+        }
+      });
+      if (spoofed) {
+        hit(30, 'Sender name impersonation: "' + spoofed + '" but mail is from ' + senderDomain,
+          'The display name borrows a trusted brand, but the address belongs to a different domain.');
+      }
+    }
 
     // Any URLs inside the message get the URL checks too (capped at 40).
     var urls = extractUrls(text);
@@ -272,7 +308,7 @@
   }
 
   var api = { analyze: analyze, analyzeUrl: analyzeUrl, analyzeMessage: analyzeMessage,
-    verdictFor: verdictFor, extractUrls: extractUrls };
+    verdictFor: verdictFor, extractUrls: extractUrls, isShortener: isShortenerHost };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.PhishShield = api;
 })(typeof window !== 'undefined' ? window : globalThis);

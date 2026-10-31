@@ -7,7 +7,9 @@ const cases = [
   ['Your electricity bill is pending. Power will be disconnected tonight. Pay now: http://electricity-bill-pay.top/', 60, 'phishing'],
   ['http://pnb-kyc-verify.shop/login', 73, 'phishing'],
   ['https://www.onlinesbi.com/', 0, 'safe'],
-  ['http://tiny.cc/abc123', 30, 'suspicious']
+  ['http://tiny.cc/abc123', 30, 'suspicious'],
+  ['"PayPal Support" <support@paypa1-security.tk>', 30, 'suspicious'],
+  ['"Amazon Support" <support@amazon.in>', 0, 'safe']
 ];
 (async () => {
   for (const [input, score, level] of cases) {

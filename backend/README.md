@@ -21,11 +21,12 @@ key. Inputs are analyzed in memory and never stored.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | Liveness check: `{ status: "ok", ... }` |
-| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note? }`. Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. |
+| POST | `/api/analyze` | Body `{ input, type? }` (`type`: `"auto"` default, `"url"`, `"message"`). Returns `{ kind, score, verdict, reasons, host?, urls?, note?, redirectChain?, finalUrl?, threatIntel? }`. URL mode only: shortener links get redirect-chain analysis, non-official URLs get a URLhaus lookup (see contract). Verdict bands: 0–29 safe, 30–59 suspicious, 60–100 phishing. Rate-limited: 100 requests per 15 minutes per IP (429 `RATE_LIMITED`). |
 | GET | `/api/samples` | Demo samples for the frontend's "Try a sample" chips. |
 
 Errors are always `{ error: { code, message } }`: `MISSING_INPUT` (400),
 `INVALID_TYPE` (400), `INPUT_TOO_LONG` (413, input over 5000 chars),
+`RATE_LIMITED` (429, with `Retry-After` header),
 `NOT_FOUND` (404), `INTERNAL_ERROR` (500). CORS is open (`*`) in v1 for the
 hackathon demo — tighten before any real deployment.
 
@@ -40,17 +41,38 @@ curl -s -X POST http://localhost:3000/api/analyze \
 
 ## Tests
 
-Contract tests run against a live server on port 3101:
+Contract tests run against a live server on port 3101. Enrichment is disabled
+for deterministic runs (redirect following and URLhaus both need network):
 
 ```bash
-PORT=3101 node server.js &
+PORT=3101 REDIRECT_ENABLED=0 URLHAUS_ENABLED=0 node server.js &
 node tests/api-contract.test.js
 node tests/new-engine.test.js
 ```
 
 `api-contract.test.js` covers all endpoints, error codes, CORS and samples.
 `new-engine.test.js` covers the extended-engine cases (Hinglish, electricity,
-APK, new brands/TLDs/shorteners).
+APK, new brands/TLDs/shorteners, sender impersonation).
+
+Unit tests need no server (they use local mock servers):
+
+```bash
+node tests/rate-limit.test.js
+node tests/redirect.test.js
+node tests/urlhaus.test.js
+```
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | Listen port (Render sets it automatically). |
+| `RATE_LIMIT_MAX` | `100` | Max `/api/analyze` requests per window per IP. |
+| `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) | Rate-limit window. |
+| `REDIRECT_ENABLED` | `1` | Set `0` to disable redirect following (deterministic tests). |
+| `REDIRECT_ALLOW_PRIVATE` | unset | Test-only: set `1` to allow redirect fetches to loopback/private hosts. Never set in production (SSRF guard). |
+| `URLHAUS_ENABLED` | `1` | Set `0` to disable URLhaus lookups (deterministic tests). |
+| `URLHAUS_API_URL` | `https://urlhaus-api.abuse.ch/v1/url/` | Override for tests (point at a mock server). |
 
 ## Deploy to Render (free tier)
 
@@ -69,7 +91,11 @@ APK, new brands/TLDs/shorteners).
 ```text
 server.js       Express app: routes, validation, CORS, error mapping
 analyzer.js     Heuristic engine (identical to the browser draft — do not fork it)
+rateLimit.js    In-memory rate limiter for /api/analyze
+redirect.js     Redirect-chain follower with SSRF guards
+urlhaus.js      URLhaus (abuse.ch) lookup, best-effort
 package.json    Express dependency + start script
+tests/          Contract + engine + unit tests
 ```
 
 ## Notes for the team
@@ -78,5 +104,6 @@ package.json    Express dependency + start script
   here, and record the new reason label in the API contract first.
 - Score is a risk signal, not a probability — the frontend must never display
   it as "95% sure".
-- Out of scope for v1: destination-page fetching, auth, accounts, history,
-  batch analysis, ML model layer.
+- Out of scope for v1: destination-page *content* fetching (redirect chains
+  are followed, page bodies never are), auth, accounts, history,
+  batch analysis, ML model layer, full domain-age/reputation lookups.
