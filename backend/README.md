@@ -129,6 +129,9 @@ Implemented and demonstrated with tests + live Render checks:
   (30 min TTL, 1000 entries); unknown results never cached
 - Structured request logs: one JSON line per request (method, path, status,
   duration, score band). Inputs, URLs, hosts, headers, and IPs are never logged
+- Punjabi support: Gurmukhi script + Roman Punjabi message checks mirroring
+  the English signals (urgency, block threat, prize, OTP request, KYC,
+  financial brand, electricity), plus a Punjabi section in the AI prompt
 - AI second-opinion wiring (borderline engine scores 30–59 only, additive
   `ai` field, engine verdict never changed) — code + mock tests done
 

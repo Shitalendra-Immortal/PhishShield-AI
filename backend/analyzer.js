@@ -210,7 +210,7 @@
     }
     if (/(share|send|tell|provide|enter)[^.]{0,25}(otp|pin|cvv|password)/.test(lower)) {
       hit(30, 'Asks you to share an OTP, PIN or password',
-        'Legitimate organizations and banks do not ask for secret credentials via unverified messages. This is a critical risk indicator.');
+        'No real bank or company ever asks for these. This alone is a red flag.');
     }
     if (/(kyc|know your customer)/.test(lower) &&
         /(update|complete|verify|pending|incomplete|expire)/.test(lower)) {
@@ -230,13 +230,60 @@
       hit(10, 'Hinglish account-block threat',
         'A closure threat written in Roman Hindi, the same lever as the English version.');
     }
+    // Punjabi (Gurmukhi script + Roman Punjabi), mirroring the English
+    // checks. Gurmukhi words are script-distinct, so they take the full
+    // English point values; Roman urgency words take +10 like the
+    // Hinglish urgency block. Shahmukhi (Urdu script) is NOT covered yet.
+    if (/(ਤੁਰੰਤ|ਹੁਣੇ|ਜਲਦੀ|ਛੇਤੀ)/.test(lower)) {
+      hit(15, 'Punjabi urgency words',
+        'Punjabi pressure words (turant, hune, jaldi, chheti) rush you the same way English urgency does.');
+    }
+    if (/(ਖਾਤਾ ਬੰਦ|ਬੰਦ ਹੋ ਜਾਵੇਗਾ|ਬਲਾਕ ਹੋ ਜਾਵੇਗਾ|ਅਕਾਊਂਟ ਬੰਦ)/.test(lower)) {
+      hit(10, 'Punjabi account-block threat',
+        'A closure threat written in Punjabi, the same lever as the English version.');
+    }
+    if (/(ਇਨਾਮ|ਜਿੱਤਿਆ|ਜਿੱਤੀ|ਲਾਟਰੀ|ਕੈਸ਼ਬੈਕ|ਵਧਾਈ)/.test(lower)) {
+      hit(25, 'Punjabi prize bait',
+        'An unexpected prize in Punjabi is the same bait as in English.');
+    }
+    if (/((ਓਟੀਪੀ|ਪਿੰਨ|ਪਾਸਵਰਡ)[^.।]{0,25}(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)|(ਸਾਂਝਾ|ਭੇਜੋ|ਦੱਸੋ|ਦਿਓ|ਪਾਓ)[^.।]{0,25}(ਓਟੀਪੀ|ਪਿੰਨ|ਪਾਸਵਰਡ))/.test(lower)) {
+      hit(30, 'Punjabi OTP request',
+        'Asking for an OTP, PIN or password in Punjabi is the same red flag as in English.');
+    }
+    if (/(ਕੇਵਾਈਸੀ|KYC)[^.।]{0,25}(ਅਪਡੇਟ|ਪੂਰਾ|ਪੂਰੀ|ਵੈਰੀਫਾਈ|ਬਕਾਇਆ|ਅਧੂਰਾ|ਅਧੂਰੀ|ਖਤਮ)/.test(lower)) {
+      hit(20, 'Punjabi KYC trick',
+        'A KYC update push written in Punjabi, the top UPI-era scam pattern.');
+    }
+    if (/(ਬੈਂਕ|sbi|hdfc|icici|paytm|phonepe|upi)[^.।]{0,40}(ਬੰਦ|ਵੈਰੀਫਾਈ|ਅਪਡੇਟ|ਲਿੰਕ|ਖਤਮ|ਬਲਾਕ)/.test(lower)) {
+      hit(10, 'Punjabi financial brand + action',
+        'A trusted money brand plus a Punjabi action you are pushed to take.');
+    }
+    if (/(ਬਿਜਲੀ)[^.।]{0,40}(ਕੱਟ|ਬਕਾਇਆ)/.test(lower)) {
+      hit(20, 'Punjabi electricity scam pattern',
+        'A fake power-cut warning written in Punjabi.');
+    }
+    // Roman Punjabi (SMS-style, as with Hinglish). "KYC update karo" is
+    // already caught by the English KYC check, so no Roman KYC rule here
+    // — adding one would count the same trick twice.
+    if (/\b(hun|hune|chheti|fauran)\b/.test(lower)) {
+      hit(10, 'Roman Punjabi urgency words',
+        'Roman Punjabi pressure words (hun, chheti) rush you the same way English urgency does.');
+    }
+    if (/((otp|pin|cvv|password)[^.]{0,25}(dasso|bhejo|deyo|paao)|(dasso|bhejo|deyo|paao)[^.]{0,25}(otp|pin|cvv|password))/.test(lower)) {
+      hit(30, 'Roman Punjabi OTP request',
+        'Asking for an OTP, PIN or password in Roman Punjabi is the same red flag as in English.');
+    }
+    if (/\b(inam|jiteya|jitya|vadhai)\b/.test(lower)) {
+      hit(25, 'Roman Punjabi prize bait',
+        'An unexpected prize in Roman Punjabi is the same bait as in English.');
+    }
     if (/(electricity|bijli|power)[^.]{0,40}(disconnect|cut off|bill[^.]{0,20}(pending|due|unpaid)|payment[^.]{0,20}(pending|due))/.test(lower)) {
       hit(20, 'Electricity disconnection scam pattern',
         'Fake power-cut warnings are a widespread Indian scam.');
     }
     if (/\bapk\b/.test(lower)) {
       hit(15, 'APK download lure',
-        'Scam messages frequently push malicious APK files pretending to be official banking software.');
+        'Scam messages push fake bank apps as APK files; real banks never distribute apps this way.');
     }
     if (/(sbi|hdfc|icici|paytm|phonepe|upi|bank)/.test(lower) &&
         /(download|install)[^.]{0,20}app/.test(lower)) {

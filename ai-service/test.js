@@ -87,6 +87,10 @@ check(
   SYSTEM_PROMPT.includes('Hinglish') && SYSTEM_PROMPT.includes('band ho jayega'),
 );
 check(
+  'system prompt covers Punjabi understanding',
+  SYSTEM_PROMPT.includes('Punjabi') && SYSTEM_PROMPT.includes('ਬੰਦ ਹੋ ਜਾਵੇਗਾ'),
+);
+check(
   'system prompt distinguishes mention from impersonation',
   SYSTEM_PROMPT.includes('mention is not impersonation'),
 );

@@ -183,6 +183,10 @@ genuine service-level failures. (Malformed JSON bodies return 400
   meaning, not English keywords — "band ho jayega" counts as a blocking
   threat, "abhi" / "turant" as urgency, "KYC update karo" as a KYC trick.
   Output stays in English.
+- **Punjabi:** messages in Gurmukhi script and Roman Punjabi are assessed
+  by meaning the same way — "ਬੰਦ ਹੋ ਜਾਵੇਗਾ" as a blocking threat,
+  "ਤੁਰੰਤ" as urgency, "OTP bhejo" as a credential request. Output stays
+  in English. Shahmukhi (Urdu script) is not covered by the rule engine.
 - **Contextual impersonation:** a brand merely mentioned is not
   impersonation. The impersonation signal needs the message to present
   itself as the brand (brand voice, sender, or signature plus an action
