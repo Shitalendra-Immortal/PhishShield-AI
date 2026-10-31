@@ -80,7 +80,8 @@ app.use(express.json({ limit: '100kb' }));
 // defaults so normal demo use never trips it; override via env for tests.
 app.use('/api/analyze', createRateLimiter({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: Number(process.env.RATE_LIMIT_MAX) || 100
+  max: Number(process.env.RATE_LIMIT_MAX) || 100,
+  maxEntries: Number(process.env.RATE_LIMIT_MAX_ENTRIES) || 5000
 }));
 
 function sendError(res, status, code, message) {
@@ -147,8 +148,8 @@ app.post('/api/analyze', async (req, res) => {
     }
   }
 
-  // Snapshot of the ENGINE result (pre-enrichment): the AI second opinion
-  // is decided on the engine score, per AI_SERVICE_CONTRACT.md.
+  // Snapshot of the ENGINE result (pre-enrichment), sent as context to
+  // the AI second opinion, per AI_SERVICE_CONTRACT.md.
   const engineSnapshot = {
     kind: result.kind,
     score: result.score,
@@ -213,10 +214,10 @@ app.post('/api/analyze', async (req, res) => {
       }
     }
   }
-  // AI second opinion (additive only): borderline ENGINE scores (30-59),
-  // and only when AI_SERVICE_URL is set. Never changes score/verdict; on
-  // any failure the field is simply omitted.
-  if (process.env.AI_SERVICE_URL && engineSnapshot.score >= 30 && engineSnapshot.score <= 59) {
+  // AI second opinion (additive only): every valid scan, and only when
+  // AI_SERVICE_URL is set. Never changes score/verdict; on any failure
+  // the field is simply omitted.
+  if (process.env.AI_SERVICE_URL) {
     try {
       const opinion = await getAiOpinion(input, engineSnapshot);
       if (opinion) result.ai = opinion;

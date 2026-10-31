@@ -30,6 +30,33 @@ const MAX_DETAIL_CHARS = 500;
 const MAX_EXPLANATION_CHARS = 1000;
 const MAX_ACTION_CHARS = 300;
 
+// Signals that describe the same underlying behaviour are NOT
+// independent evidence for high confidence. A rush, a deadline, and a
+// threat are one pressure tactic wearing three wordings; claiming to be
+// an authority and impersonating a brand are one false-identity claim.
+// Every other signal type counts on its own. (unusual_sender stays
+// independent on purpose: a mismatched sender is a separate observable
+// from the brand claim itself, not just a rewording of it.)
+const SIGNAL_CLUSTERS = {
+  pressure: ['manufactured_urgency', 'fake_deadline', 'pressure_to_act'],
+  identity: ['impersonation', 'false_authority'],
+};
+
+// Count genuinely independent pieces of evidence: each cluster counts
+// once no matter how many of its signals appear; every other signal
+// counts once.
+function independentSignalCount(signals) {
+  const groups = new Set();
+  for (const s of signals) {
+    let grouped = false;
+    for (const [name, types] of Object.entries(SIGNAL_CLUSTERS)) {
+      if (types.includes(s.type)) { groups.add(name); grouped = true; break; }
+    }
+    if (!grouped) groups.add(s.type);
+  }
+  return groups.size;
+}
+
 const SIGNAL_MEANINGS = {
   false_authority: 'Claims to be a bank, brand, or official body without proof.',
   manufactured_urgency: 'Rushes the reader ("now", "immediately", "last chance").',
@@ -78,9 +105,14 @@ const SYSTEM_PROMPT = [
   '  as a sender or link that does not match the claimed brand.',
   '- Never state certainty as a percentage or number. Use only',
   '  "low", "medium", or "high" for confidence.',
-  '- "high" confidence only when two or more independent signals support the',
-  '  assessment. "medium" for one strong signal. "low" otherwise, including',
-  '  when you disagree with the rule engine on thin evidence.',
+  '- "high" confidence only when two or more INDEPENDENT pieces of evidence',
+  '  support the assessment. Signals describing the same behaviour are one',
+  '  piece, not two: a rush ("act now"), a deadline ("within 24 hours"),',
+  '  and a threat ("account blocked") are one pressure tactic; claiming to',
+  '  be an authority and impersonating a brand are one false-identity',
+  '  claim. "medium" for one piece of strong evidence, even if you phrase',
+  '  it as two signals. "low" otherwise, including when you disagree with',
+  '  the rule engine on thin evidence.',
   '- If the evidence is insufficient, say so in the explanation and use',
   '  "low" confidence. Do not guess a stronger verdict than the evidence allows.',
   '',
@@ -210,9 +242,21 @@ function parseAiOutput(text) {
  *
  * Two contract guardrails are enforced here, not just in the prompt, so a
  * model that slips cannot produce a contract-violating verdict:
- *  - "high" confidence with fewer than two signals is downgraded to "medium".
+ *  - "high" confidence with fewer than two INDEPENDENT signals is
+ *    downgraded to "medium". Two signals from the same cluster — a rush
+ *    plus a deadline, or an authority claim plus impersonation — count
+ *    as one piece of evidence, not two (see independentSignalCount).
  *  - "phishing" supported only by a single suspicious_link signal is
  *    downgraded to "suspicious" (URL honesty rule).
+ * Cross-field validation (fields must make sense together):
+ *  - "phishing" with no signals at all is rejected: an alarming verdict
+ *    with zero supporting evidence is not a valid opinion. The caller
+ *    retries once, then the service answers available: false.
+ *  - "safe" listing a credential request plus a false-identity signal
+ *    contradicts itself: the signals are the evidence, the label is the
+ *    wrong part, so the verdict is downgraded to "suspicious". It is
+ *    never upgraded to phishing, and a credential request on its own
+ *    never triggers this — legitimate contexts matter.
  * Output limits are enforced as rejections (the caller retries once, then
  * the service answers available: false):
  *  - duplicate signal types are rejected (repeats must not fake the
@@ -277,7 +321,7 @@ function validateAiOutput(obj) {
   };
 
   // Guardrail 1: high confidence needs 2+ independent signals.
-  if (data.confidence === 'high' && data.signals.length < 2) {
+  if (data.confidence === 'high' && independentSignalCount(data.signals) < 2) {
     data.confidence = 'medium';
   }
   // Guardrail 2: a lone odd URL cannot be a phishing verdict.
@@ -286,6 +330,22 @@ function validateAiOutput(obj) {
     data.signals.length === 1 &&
     data.signals[0].type === 'suspicious_link'
   ) {
+    data.assessment = 'suspicious';
+  }
+
+  // Cross-field validation: the verdict must cohere with its signals.
+  // A phishing verdict with no supporting signal is rejected outright
+  // (an evidence-free alarming verdict helps nobody).
+  if (data.assessment === 'phishing' && data.signals.length === 0) {
+    return { ok: false, reason: 'phishing assessment has no supporting signals.' };
+  }
+  // A safe verdict that itself lists a credential request plus a
+  // false-identity signal contradicts itself. The signals are the
+  // evidence, so the verdict moves to suspicious — never to phishing,
+  // and a credential request on its own never triggers this.
+  const hasCredential = data.signals.some((s) => s.type === 'credential_request');
+  const hasIdentity = data.signals.some((s) => SIGNAL_CLUSTERS.identity.includes(s.type));
+  if (data.assessment === 'safe' && hasCredential && hasIdentity) {
     data.assessment = 'suspicious';
   }
 
@@ -306,6 +366,8 @@ function unavailableResponse() {
 
 module.exports = {
   SIGNAL_TYPES,
+  SIGNAL_CLUSTERS,
+  independentSignalCount,
   ASSESSMENTS,
   CONFIDENCES,
   SYSTEM_PROMPT,

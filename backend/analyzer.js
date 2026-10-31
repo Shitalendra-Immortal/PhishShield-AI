@@ -136,9 +136,17 @@
         'Extra subdomains are used to make a fake address look official.');
     }
     var tld = hostNoWww.split('.').pop();
+    // Weak signals: a suspicious TLD or a pressure word on its own is
+    // not enough to flag a URL. Either one only scores when something
+    // else already fired, or when both are present together (two
+    // independent weak signals corroborate each other). A legitimate
+    // login page or a harmless .xyz site no longer scores on one word
+    // alone. The URLhaus check in URL mode still catches listed domains
+    // regardless of this engine score.
+    var weakTld = null;
     if (SUSPICIOUS_TLDS.indexOf(tld) !== -1) {
-      hit(15, 'Suspicious top-level domain (.' + tld + ')',
-        'This ending is cheap, lightly policed, and heavily abused by scam sites.');
+      weakTld = { points: 15, label: 'Suspicious top-level domain (.' + tld + ')',
+        detail: 'This ending is cheap, lightly policed, and heavily abused by scam sites.' };
     }
     if (host.indexOf('xn--') !== -1) {
       hit(25, 'Punycode (xn--) in the domain',
@@ -162,7 +170,10 @@
       hit(30, 'Brand name "' + impersonated + '" in an unofficial domain',
         'The address borrows a trusted brand name but is not that brand\'s site.');
     }
-    if (!/^https:\/\//i.test(url) && /^https?:\/\//i.test(url)) {
+    // Plain http only: the first test excludes https, so the second
+    // test must match http exactly (the old https? form was equivalent
+    // but read as if it could match https too).
+    if (!/^https:\/\//i.test(url) && /^http:\/\//i.test(url)) {
       hit(10, 'No HTTPS encryption',
         'Login and payment pages without HTTPS expose anything you type.');
     }
@@ -178,9 +189,16 @@
     URL_SUSPICIOUS_WORDS.forEach(function (w) {
       if (!foundWord && lower.indexOf(w) !== -1) foundWord = w;
     });
+    var weakWord = null;
     if (foundWord) {
-      hit(8, 'Pressure word in the URL: "' + foundWord + '"',
-        'Scam links love words like verify, secure and update to feel urgent.');
+      weakWord = { points: 8, label: 'Pressure word in the URL: "' + foundWord + '"',
+        detail: 'Scam links love words like verify, secure and update to feel urgent.' };
+    }
+    // Corroboration rule (see the TLD block above): weak signals count
+    // only alongside another signal, or together with each other.
+    if (reasons.length > 0 || (weakTld && weakWord)) {
+      if (weakTld) hit(weakTld.points, weakTld.label, weakTld.detail);
+      if (weakWord) hit(weakWord.points, weakWord.label, weakWord.detail);
     }
     return { score: score, reasons: reasons, host: host, note: null };
   }

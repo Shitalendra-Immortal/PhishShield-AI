@@ -13,13 +13,22 @@
 
 const net = require('net');
 
-// Two-label suffixes common in India / the UK / Australia. Starter list,
-// not the full public-suffix list (see README.md limitations).
+// Two-label suffixes common in India / the UK / Australia, plus the
+// major free-hosting suffixes. Still a curated list, not the full
+// public-suffix list (see README.md limitations) — but the hosting
+// entries matter: a phishing page on evil.vercel.app is a different
+// registrable domain from vercel.app, and the old list missed that,
+// which made sender-mismatch checks blind there.
 const TWO_LABEL_SUFFIXES = new Set([
   'co.uk', 'org.uk', 'ac.uk', 'gov.uk',
   'co.in', 'org.in', 'ac.in', 'gov.in', 'net.in',
   'com.au', 'org.au', 'net.au',
-  'co.nz', 'com.br', 'co.za',
+  'co.nz', 'org.nz', 'com.br', 'co.za', 'co.jp',
+  'com.mx', 'com.ar', 'com.co',
+  'github.io', 'gitlab.io', 'vercel.app', 'netlify.app', 'pages.dev',
+  'web.app', 'firebaseapp.com', 'appspot.com', 'herokuapp.com',
+  'azurewebsites.net', 'cloudfront.net', 's3.amazonaws.com',
+  'wordpress.com', 'blogspot.com', 'notion.site',
 ]);
 
 function isIPv4(hostname) {
@@ -53,6 +62,24 @@ function isPrivateIPv4(hostname) {
  * already in backend/urlhaus.js and backend/redirect.js.
  * If this returns true, the URL must NOT be fetched — SSRF protection.
  */
+// Embedded IPv4 inside an IPv4-mapped (::ffff:10.0.0.1, ::ffff:a00:1)
+// or NAT64 (64:ff9b::10.0.0.1, 64:ff9b::a00:1) address. Returns the
+// dotted IPv4 string, or null when the address is neither form.
+function embeddedIPv4(hostname) {
+  const h = hostname.toLowerCase();
+  let rest = null;
+  if (h.startsWith('::ffff:')) rest = h.slice('::ffff:'.length);
+  else if (h.startsWith('64:ff9b::')) rest = h.slice('64:ff9b::'.length);
+  else return null;
+  if (rest.includes('.')) return rest;
+  const groups = rest.split(':');
+  if (groups.length < 2) return null;
+  const hi = parseInt(groups[groups.length - 2], 16);
+  const lo = parseInt(groups[groups.length - 1], 16);
+  if (isNaN(hi) || isNaN(lo)) return null;
+  return [(hi >> 8) & 255, hi & 255, (lo >> 8) & 255, lo & 255].join('.');
+}
+
 function isPrivateIP(hostname) {
   if (!hostname) return false;
   if (isIPv4(hostname)) return isPrivateIPv4(hostname);
@@ -62,6 +89,9 @@ function isPrivateIP(hostname) {
     if (h.startsWith('fe8') || h.startsWith('fe9') || h.startsWith('fea') || h.startsWith('feb')) return true; // fe80::/10
     if (h.startsWith('fc') || h.startsWith('fd')) return true; // fc00::/7
     if (h.startsWith('ff')) return true; // multicast
+    if (h.startsWith('2001:db8')) return true; // documentation range, not publicly routable
+    const embedded = embeddedIPv4(h);
+    if (embedded) return isPrivateIPv4(embedded); // mapped / NAT64: judge the real IPv4
   }
   return false;
 }
@@ -101,7 +131,10 @@ function parseUrl(input) {
   } catch (e) {
     throw new Error('INVALID_URL');
   }
-  const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
+  // WHATWG URL keeps brackets on IPv6 hostnames ([::1]); strip them,
+  // or net.isIP() sees "[::1]" as not-an-IP and IPv6 URLs slip past
+  // the isIP / isBlockedHost checks entirely.
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '').replace(/^\[|\]$/g, '');
   const domain = getRegistrableDomain(hostname);
   const domainLabels = domain ? domain.split('.') : [];
   const hostLabels = hostname.split('.').filter(Boolean);
