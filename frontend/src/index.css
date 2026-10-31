@@ -79,28 +79,28 @@
   [data-theme="light"],
   html.light,
   body.light {
-    /* Light theme (default) - clean, bright, pure white */
-    --color-ink: #ffffff;
-    --color-surface: #fafafa;
+    /* Light theme (default) - delicate light cream main background */
+    --color-ink: #faf8f5;
+    --color-surface: #ffffff;
     --color-card: #ffffff;
-    --color-elevated: #f4f4f6;
-    --color-interactive: #eaeaee;
-    --color-line: #e5e5ea;
-    --color-line-soft: #f0f0f3;
-    --color-cream: #18181b;
-    --color-muted: #71717a;
+    --color-elevated: #f2efeb;
+    --color-interactive: #e9e5de;
+    --color-line: #eae6df;
+    --color-line-soft: #f2eee8;
+    --color-cream: #1c1917;
+    --color-muted: #78716c;
 
     --color-safe: #16a34a;
     --color-warn: #d97706;
     --color-danger: #dc2626;
 
-    --hero-ring-subtle: rgba(0, 0, 0, 0.05);
-    --hero-ring-mid: rgba(0, 0, 0, 0.09);
-    --hero-ring-brand: rgba(241, 91, 59, 0.28);
-    --hero-ring-inner: rgba(241, 91, 59, 0.42);
-    --hero-reticle: rgba(241, 91, 59, 0.55);
+    --hero-ring-subtle: rgba(28, 25, 23, 0.05);
+    --hero-ring-mid: rgba(28, 25, 23, 0.09);
+    --hero-ring-brand: rgba(241, 91, 59, 0.3);
+    --hero-ring-inner: rgba(241, 91, 59, 0.45);
+    --hero-reticle: rgba(241, 91, 59, 0.6);
     --hero-shield-fill-1: rgba(255, 255, 255, 0.85);
-    --hero-shield-fill-2: rgba(244, 244, 246, 0.55);
+    --hero-shield-fill-2: rgba(242, 239, 235, 0.6);
     --hero-shield-stroke-1: #f15b3b;
     --hero-shield-stroke-2: #ff874c;
     --hero-shield-inner: rgba(241, 91, 59, 0.35);

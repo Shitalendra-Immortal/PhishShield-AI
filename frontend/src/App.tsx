@@ -16,7 +16,7 @@ export default function App() {
   const { history, add, remove, clear } = useHistory(settings.storeHistory);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [view, active?.id]);
 
   // Synchronize dark/light theme on document root
@@ -33,6 +33,7 @@ export default function App() {
   }, [settings.theme]);
 
   const navigate = useCallback((next: View) => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setView(next);
     if (next !== "result") setActive(null);
   }, []);
@@ -70,17 +71,19 @@ export default function App() {
   );
 
   const openScan = useCallback((scan: ScanResult) => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setActive(scan);
     setView("result");
   }, []);
 
   const deleteScan = useCallback(
     (id: string) => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       remove(id);
       setActive(null);
-      setView("history");
+      setView(history.length <= 1 ? "scan" : "history");
     },
-    [remove],
+    [remove, history.length],
   );
 
   return (

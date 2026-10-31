@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { HelpCircle, Moon, Sun, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import type { Settings } from "../types";
 import { cn } from "../utils/cn";
 import { Button, Eyebrow, ThreatIcon, Wordmark } from "./ui";
@@ -120,41 +120,43 @@ function NavPill({
   const active: View = view === "result" ? "scan" : view;
 
   return (
-    <nav
-      className={cn(
-        "relative flex items-center gap-1 rounded-[16px] border border-line bg-surface p-1 shadow-sm",
-        className,
-      )}
-    >
-      {NAV.map((item) => {
-        const isActive = active === item.id;
-        return (
-          <motion.button
-            key={item.id}
-            type="button"
-            onClick={() => onNavigate(item.id)}
-            whileTap={{ scale: 0.97 }}
-            transition={SPRING_PRESS}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-              "relative rounded-[10px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring sm:px-4 sm:py-1.5",
-              isActive
-                ? "font-semibold text-[#1B1011]"
-                : "text-muted hover:text-cream hover:bg-interactive/40",
-            )}
-          >
-            {isActive && (
-              <motion.span
-                layoutId="nav-pill-active"
-                className="absolute inset-0 rounded-[10px] bg-flame-gradient shadow-sm"
-                transition={SPRING_SELECTION}
-              />
-            )}
-            <span className="relative z-10">{item.label}</span>
-          </motion.button>
-        );
-      })}
-    </nav>
+    <LayoutGroup id="nav-pill-group">
+      <nav
+        className={cn(
+          "relative flex items-center gap-1 rounded-[16px] border border-line bg-surface p-1 shadow-sm",
+          className,
+        )}
+      >
+        {NAV.map((item) => {
+          const isActive = active === item.id;
+          return (
+            <motion.button
+              key={item.id}
+              type="button"
+              onClick={() => onNavigate(item.id)}
+              whileTap={{ scale: 0.97 }}
+              transition={SPRING_PRESS}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "relative rounded-[10px] px-3.5 py-1.5 text-[0.84rem] font-sans font-medium outline-none transition-colors duration-200 focus-visible:focus-ring sm:px-4 sm:py-1.5",
+                isActive
+                  ? "font-semibold text-[#1B1011]"
+                  : "text-muted hover:text-cream hover:bg-interactive/40",
+              )}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="nav-pill-active"
+                  className="absolute inset-0 rounded-[10px] bg-flame-gradient shadow-sm"
+                  transition={SPRING_SELECTION}
+                />
+              )}
+              <span className="relative z-10">{item.label}</span>
+            </motion.button>
+          );
+        })}
+      </nav>
+    </LayoutGroup>
   );
 }
 

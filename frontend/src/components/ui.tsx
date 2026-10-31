@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { RiskLevel, ScanType, Severity } from "../types";
 import { cn } from "../utils/cn";
 import { ThreatIcon } from "./ThreatIcon";
@@ -157,8 +158,17 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
   high: "bg-danger",
 };
 
+const RISK_ICONS: Record<RiskLevel, typeof ShieldCheck> = {
+  safe: ShieldCheck,
+  low: ShieldCheck,
+  suspicious: AlertTriangle,
+  phishing: ShieldAlert,
+  high: ShieldAlert,
+};
+
 export function RiskPill({ level, className }: { level: RiskLevel; className?: string }) {
   const s = RISK_STYLES[level] || RISK_STYLES.safe;
+  const Icon = RISK_ICONS[level] || ShieldCheck;
   return (
     <span
       className={cn(
@@ -169,7 +179,7 @@ export function RiskPill({ level, className }: { level: RiskLevel; className?: s
         className,
       )}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", s.dot)} />
+      <Icon className="h-3.5 w-3.5 shrink-0" />
       {s.label}
     </span>
   );

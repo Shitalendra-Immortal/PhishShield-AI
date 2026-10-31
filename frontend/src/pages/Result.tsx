@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   Info,
+  Lightbulb,
   Route,
   ShieldAlert,
   ShieldCheck,
@@ -294,10 +295,10 @@ export function Result({
       </div>
 
       {/* Main Verdict Card: 16px radius, solid tonal surface */}
-      <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface px-6 py-8 sm:px-10 sm:py-9">
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+      <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface p-6 sm:p-8 lg:p-9">
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 mb-3.5 sm:mb-4">
               <Eyebrow>Security assessment</Eyebrow>
               <span className="h-1 w-1 rounded-full bg-muted/60" />
               <span className="font-sans text-[0.8rem] font-semibold uppercase tracking-[0.14em] text-cream/90">
@@ -311,7 +312,7 @@ export function Result({
               )}
             </div>
 
-            <h1 className="mt-3.5 font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[2.8rem]">
+            <h1 className="font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[2.8rem]">
               {scan.verdict}
             </h1>
 
@@ -663,9 +664,12 @@ export function Result({
         )}
       </section>
 
-      {/* Recommended Action: 16px radius card */}
-      <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface">
-        <header className="px-6 py-4 border-b border-line-soft sm:px-8">
+      {/* Recommended Action: 16px radius card with dedicated accent shade */}
+      <section className="relative overflow-hidden rounded-[16px] border border-line-soft border-l-[4px] border-r-[4px] border-l-flame border-r-flame bg-gradient-to-br from-elevated/70 via-surface to-elevated/40 shadow-sm">
+        <header className="flex items-center gap-2.5 px-6 py-4 border-b border-line-soft sm:px-8 bg-surface/50">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-flame/12 text-flame">
+            <Lightbulb className="h-3.5 w-3.5" />
+          </span>
           <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
             Recommended Action
           </h2>
@@ -751,7 +755,12 @@ export function Result({
           </Button>
         </div>
 
-        <Button size="lg" variant="quiet" onClick={() => onDelete(scan.id)}>
+        <Button
+          size="lg"
+          variant="quiet"
+          onClick={() => onDelete(scan.id)}
+          className="text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+        >
           <Trash2 className="h-4 w-4 text-danger/80" />
           Delete scan
         </Button>
