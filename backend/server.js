@@ -10,6 +10,7 @@ const PhishShield = require('./analyzer.js');
 const { createRateLimiter } = require('./rateLimit.js');
 const { followRedirects } = require('./redirect.js');
 const { lookupUrlhaus } = require('./urlhaus.js');
+const { getAiOpinion } = require('./ai.js');
 
 const PORT = process.env.PORT || 3000;
 const MAX_INPUT = 5000;
@@ -123,6 +124,15 @@ app.post('/api/analyze', async (req, res) => {
     }
   }
 
+  // Snapshot of the ENGINE result (pre-enrichment): the AI second opinion
+  // is decided on the engine score, per AI_SERVICE_CONTRACT.md.
+  const engineSnapshot = {
+    kind: result.kind,
+    score: result.score,
+    verdict: result.verdict,
+    reasons: result.reasons.slice()
+  };
+
   // URL-mode enrichment (additive only; never breaks the base verdict).
   // Message mode gets no enrichment: short links inside messages are
   // already capped at 40 points by the engine.
@@ -159,7 +169,7 @@ app.post('/api/analyze', async (req, res) => {
             result.verdict = PhishShield.verdictFor(result.score);
           }
         }
-        // URLhaus: keyless, best-effort. Listed => +60 (forces Phishing band).
+        // URLhaus: Auth-Key header from env, best-effort. Listed => +60 (forces Phishing band).
         // Any failure leaves the base verdict untouched.
         if (process.env.URLHAUS_ENABLED !== '0') {
           const intel = await lookupUrlhaus(result.finalUrl || targetUrl, {});
@@ -178,6 +188,17 @@ app.post('/api/analyze', async (req, res) => {
       } catch (e) {
         // Enrichment must never break the base verdict.
       }
+    }
+  }
+  // AI second opinion (additive only): borderline ENGINE scores (30-59),
+  // and only when AI_SERVICE_URL is set. Never changes score/verdict; on
+  // any failure the field is simply omitted.
+  if (process.env.AI_SERVICE_URL && engineSnapshot.score >= 30 && engineSnapshot.score <= 59) {
+    try {
+      const opinion = await getAiOpinion(input, engineSnapshot);
+      if (opinion) result.ai = opinion;
+    } catch (e) {
+      // AI is never on the critical path.
     }
   }
   return res.json(result);
