@@ -145,7 +145,10 @@ message-mode math: message signals 55 + link risk capped at 40 = 95.)
   mode does not follow redirects.
 - **URLhaus lookup:** when the URL is not an exact official domain, the backend
   checks the final destination (or the input URL, when no redirect ran)
-  against the abuse.ch URLhaus malicious-URL database (free, no API key). If
+  against the abuse.ch URLhaus malicious-URL database (requires a free
+  Auth-Key, supplied via the `URLHAUS_AUTH_KEY` env var and never committed
+  to the repo; without a key the API answers 401 and lookups report
+  `unknown`). If
   listed, a reason `"Listed in URLhaus malicious-URL database"` (+60 points) is
   added, which forces the Phishing band. If the lookup fails or is skipped,
   `threatIntel.status` is `"unknown"` and the base verdict stands. Message mode

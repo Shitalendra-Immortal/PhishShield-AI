@@ -18,6 +18,14 @@ async function main() {
     req.on('end', function () {
       const params = new URLSearchParams(body);
       const url = params.get('url') || '';
+      if (url.indexOf('needauth') !== -1) {
+        if (req.headers['auth-key'] === 'test-key-123') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ query_status: 'ok', threat: 'phishing', url_status: 'online' }));
+        }
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Unauthorized' }));
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       if (url.indexOf('malware') !== -1) {
         return res.end(JSON.stringify({
@@ -46,6 +54,16 @@ async function main() {
   check('unreachable API -> unknown', dead.status === 'unknown');
   const local = await lookupUrlhaus('http://localhost:3000/x', { apiUrl: api });
   check('localhost skipped -> unknown', local.status === 'unknown');
+  const noKey = await lookupUrlhaus('https://needauth.example.com/x', { apiUrl: api });
+  check('missing key -> 401 -> unknown', noKey.status === 'unknown');
+  const withKey = await lookupUrlhaus('https://needauth.example.com/x',
+    { apiUrl: api, authKey: 'test-key-123' });
+  check('Auth-Key header sent -> listed',
+    withKey.status === 'listed' && withKey.threat === 'phishing');
+  process.env.URLHAUS_AUTH_KEY = 'test-key-123';
+  const envKey = await lookupUrlhaus('https://needauth.example.com/x', { apiUrl: api });
+  delete process.env.URLHAUS_AUTH_KEY;
+  check('env URLHAUS_AUTH_KEY used -> listed', envKey.status === 'listed');
 
   server.close();
   console.log('\n' + passed + ' passed, ' + failed + ' failed.');

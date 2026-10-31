@@ -73,6 +73,7 @@ node tests/urlhaus.test.js
 | `REDIRECT_ALLOW_PRIVATE` | unset | Test-only: set `1` to allow redirect fetches to loopback/private hosts. Never set in production (SSRF guard). |
 | `URLHAUS_ENABLED` | `1` | Set `0` to disable URLhaus lookups (deterministic tests). |
 | `URLHAUS_API_URL` | `https://urlhaus-api.abuse.ch/v1/url/` | Override for tests (point at a mock server). |
+| `URLHAUS_AUTH_KEY` | (none) | Free Auth-Key from abuse.ch (auth.abuse.ch). Required for URLhaus lookups; without it lookups report `unknown`. Never commit a real key — set it in Render's dashboard env vars. |
 
 ## Deploy to Render (free tier)
 
