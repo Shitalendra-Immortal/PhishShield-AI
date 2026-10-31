@@ -1,4 +1,7 @@
-// URLhaus (abuse.ch) lookup: free, no API key for basic URL lookups.
+// URLhaus (abuse.ch) lookup. Requires a free Auth-Key (abuse.ch account):
+// the key comes from env URLHAUS_AUTH_KEY (or opts.authKey) and is never
+// logged or committed. Without a key the API answers 401 and lookups
+// degrade to 'unknown'.
 // Best-effort signal only: any failure returns 'unknown' and the caller
 // must still return its normal verdict. Never send private/local URLs.
 'use strict';
@@ -20,6 +23,7 @@ async function lookupUrlhaus(url, options) {
   var opts = options || {};
   var apiUrl = opts.apiUrl || process.env.URLHAUS_API_URL ||
     'https://urlhaus-api.abuse.ch/v1/url/';
+  var authKey = opts.authKey || process.env.URLHAUS_AUTH_KEY || '';
   var timeoutMs = opts.timeoutMs || 5000;
   try {
     var host = new URL(url).hostname.toLowerCase();
@@ -30,9 +34,11 @@ async function lookupUrlhaus(url, options) {
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
     try {
+      var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+      if (authKey) headers['Auth-Key'] = authKey;
       var res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: headers,
         body: new URLSearchParams({ url: url }).toString(),
         signal: controller.signal
       });
