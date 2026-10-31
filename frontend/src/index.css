@@ -79,34 +79,37 @@
   [data-theme="light"],
   html.light,
   body.light {
-    /* Light theme (default) */
-    --color-ink: #f4f0e9;
-    --color-surface: #fbf9f5;
-    --color-card: #fbf9f5;
-    --color-elevated: #ede7de;
-    --color-interactive: #e4dbd0;
-    --color-line: #ddd6ca;
-    --color-line-soft: #e7e2d8;
-    --color-cream: #211f1e;
-    --color-muted: #716b65;
+    /* Light theme (default) - clean, bright, pure white */
+    --color-ink: #ffffff;
+    --color-surface: #fafafa;
+    --color-card: #ffffff;
+    --color-elevated: #f4f4f6;
+    --color-interactive: #eaeaee;
+    --color-line: #e5e5ea;
+    --color-line-soft: #f0f0f3;
+    --color-cream: #18181b;
+    --color-muted: #71717a;
 
-    --color-safe: #2f8546;
-    --color-warn: #b86208;
-    --color-danger: #cf3826;
+    --color-safe: #16a34a;
+    --color-warn: #d97706;
+    --color-danger: #dc2626;
 
-    --hero-ring-subtle: rgba(33, 31, 30, 0.1);
-    --hero-ring-mid: rgba(33, 31, 30, 0.18);
-    --hero-ring-brand: rgba(241, 91, 59, 0.45);
-    --hero-ring-inner: rgba(241, 91, 59, 0.6);
-    --hero-reticle: rgba(241, 91, 59, 0.75);
-    --hero-shield-fill-1: rgba(251, 249, 245, 0.9);
-    --hero-shield-fill-2: rgba(237, 231, 222, 0.75);
-    --hero-shield-stroke-1: #e44d2d;
-    --hero-shield-stroke-2: #f15b3b;
-    --hero-shield-inner: rgba(228, 77, 45, 0.45);
-    --hero-node-core: #e44d2d;
-    --hero-node-ring: rgba(241, 91, 59, 0.5);
-    --hero-radar-beam: rgba(228, 77, 45, 0.8);
+    --hero-ring-subtle: rgba(0, 0, 0, 0.05);
+    --hero-ring-mid: rgba(0, 0, 0, 0.09);
+    --hero-ring-brand: rgba(241, 91, 59, 0.28);
+    --hero-ring-inner: rgba(241, 91, 59, 0.42);
+    --hero-reticle: rgba(241, 91, 59, 0.55);
+    --hero-shield-fill-1: rgba(255, 255, 255, 0.85);
+    --hero-shield-fill-2: rgba(244, 244, 246, 0.55);
+    --hero-shield-stroke-1: #f15b3b;
+    --hero-shield-stroke-2: #ff874c;
+    --hero-shield-inner: rgba(241, 91, 59, 0.35);
+    --hero-node-core: #f15b3b;
+    --hero-node-ring: rgba(241, 91, 59, 0.35);
+    --hero-radar-beam: rgba(241, 91, 59, 0.6);
+    --hero-torch-beam: #ff874c;
+    --hero-torch-ray: rgba(241, 91, 59, 0.7);
+    --hero-torch-glow: rgba(255, 135, 76, 0.18);
   }
 
   [data-theme="dark"],
@@ -133,13 +136,16 @@
     --hero-ring-inner: rgba(255, 135, 76, 0.4);
     --hero-reticle: rgba(241, 91, 59, 0.5);
     --hero-shield-fill-1: rgba(241, 91, 59, 0.08);
-    --hero-shield-fill-2: rgba(29, 27, 29, 0.7);
+    --hero-shield-fill-2: rgba(29, 27, 29, 0.6);
     --hero-shield-stroke-1: #f15b3b;
     --hero-shield-stroke-2: #ff874c;
     --hero-shield-inner: rgba(255, 193, 138, 0.4);
     --hero-node-core: #ff874c;
     --hero-node-ring: rgba(241, 91, 59, 0.4);
     --hero-radar-beam: rgba(241, 91, 59, 0.75);
+    --hero-torch-beam: #ff874c;
+    --hero-torch-ray: rgba(255, 135, 76, 0.85);
+    --hero-torch-glow: rgba(241, 91, 59, 0.22);
   }
 
   * {

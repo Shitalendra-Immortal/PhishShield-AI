@@ -17,6 +17,24 @@ function HeroComposition() {
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
+          {/* Torch light blur filter - soft ethereal glow */}
+          <filter id="torchGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="4.5" result="blur" />
+          </filter>
+
+          {/* Torch radial gradient: very soft, light, translucent falloff */}
+          <radialGradient
+            id="torchGrad"
+            cx="180"
+            cy="180"
+            r="145"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor="var(--hero-torch-beam)" stopOpacity="0.22" />
+            <stop offset="45%" stopColor="var(--hero-torch-beam)" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="var(--hero-torch-beam)" stopOpacity="0" />
+          </radialGradient>
+
           <linearGradient id="shieldGrad" x1="180" y1="110" x2="180" y2="250" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="var(--hero-shield-stroke-1)" stopOpacity="0.9" />
             <stop offset="60%" stopColor="var(--hero-shield-stroke-2)" stopOpacity="0.6" />
@@ -40,16 +58,23 @@ function HeroComposition() {
         <line x1="14" y1="180" x2="26" y2="180" stroke="var(--hero-reticle)" strokeWidth="1.5" />
         <line x1="334" y1="180" x2="346" y2="180" stroke="var(--hero-reticle)" strokeWidth="1.5" />
 
-        {/* Subtle scanning sweep / radar arc */}
-        <g className="origin-center animate-[spin_14s_linear_infinite]">
-          <line
-            x1="180"
-            y1="180"
-            x2="272"
-            y2="88"
-            stroke="var(--hero-radar-beam)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
+        {/* Torch light beam: seamless, soft, volumetric light cone with no hard edges or dark lines */}
+        <g
+          style={{ transformOrigin: "180px 180px" }}
+          className="animate-[spin_14s_linear_infinite]"
+        >
+          {/* Soft blurred volumetric torch haze */}
+          <path
+            d="M 180 180 L 140 40.6 A 145 145 0 0 1 220 40.6 Z"
+            fill="url(#torchGrad)"
+            filter="url(#torchGlow)"
+          />
+
+          {/* Very light inner cone fill */}
+          <path
+            d="M 180 180 L 140 40.6 A 145 145 0 0 1 220 40.6 Z"
+            fill="url(#torchGrad)"
+            opacity="0.6"
           />
         </g>
 

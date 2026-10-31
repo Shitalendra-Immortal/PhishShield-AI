@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Moon, Sun, X } from "lucide-react";
+import { HelpCircle, Moon, Sun, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Settings } from "../types";
 import { cn } from "../utils/cn";
@@ -26,7 +26,7 @@ const SPRING_PRESS = {
   damping: 30,
 };
 
-/* ── Theme Toggle Component (Solid Tonal) ─────────────────────── */
+/* ── Theme Toggle Component (Solid Tonal, no glowing border) ─── */
 
 function ThemeToggle({
   theme,
@@ -41,9 +41,9 @@ function ThemeToggle({
     <motion.button
       type="button"
       onClick={onToggle}
-      whileTap={{ scale: 0.94 }}
+      whileTap={{ scale: 0.92 }}
       transition={SPRING_PRESS}
-      className="relative flex h-8.5 w-8.5 items-center justify-center rounded-[10px] border border-line bg-elevated text-muted transition-colors hover:bg-interactive hover:text-cream focus-visible:focus-ring overflow-hidden"
+      className="relative flex h-8.5 w-8.5 items-center justify-center rounded-[10px] border border-line bg-elevated text-muted transition-colors hover:bg-interactive hover:text-cream outline-none focus:outline-none overflow-hidden"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
@@ -59,10 +59,38 @@ function ThemeToggle({
           {isDark ? (
             <Sun className="h-4 w-4 text-peach" />
           ) : (
-            <Moon className="h-4 w-4 text-flame" />
+            <Moon className="h-4 w-4 text-cream/90" />
           )}
         </motion.span>
       </AnimatePresence>
+    </motion.button>
+  );
+}
+
+/* ── Methodology / Help Button (Animated Question Mark Icon) ──── */
+
+function HelpButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      whileTap={{ scale: 0.92 }}
+      transition={SPRING_PRESS}
+      className="relative flex h-8.5 w-8.5 items-center justify-center rounded-[10px] border border-line bg-elevated text-muted transition-colors hover:bg-interactive hover:text-cream outline-none focus:outline-none overflow-hidden"
+      aria-label="Methodology & settings"
+      title="Methodology & settings"
+    >
+      <motion.span
+        className="inline-flex items-center justify-center"
+        animate={hovered ? { rotate: [0, -14, 12, -6, 0] } : { rotate: 0 }}
+        transition={{ duration: 0.45, ease: "easeInOut" }}
+      >
+        <HelpCircle className="h-4 w-4" />
+      </motion.span>
     </motion.button>
   );
 }
@@ -356,16 +384,11 @@ export function AppShell({
 
           {/* Secondary actions on the right */}
           <div className="flex items-center justify-end gap-2 shrink-0 z-10 sm:w-48">
-            {/* Theme Toggle Button */}
+            {/* Theme Toggle Button (Clean solid tonal, no glowing border) */}
             <ThemeToggle theme={currentTheme} onToggle={toggleTheme} />
 
-            <button
-              type="button"
-              onClick={() => setDrawer(true)}
-              className="rounded-[12px] border border-line bg-elevated px-3.5 py-1.5 text-[0.84rem] font-sans font-medium text-muted transition-colors hover:bg-interactive hover:text-cream focus-visible:focus-ring"
-            >
-              Methodology
-            </button>
+            {/* Methodology & Help Button (Animated Question Mark Icon using Animate UI tokens) */}
+            <HelpButton onClick={() => setDrawer(true)} />
           </div>
         </div>
       </header>
@@ -388,7 +411,7 @@ export function AppShell({
           <button
             type="button"
             onClick={() => setDrawer(true)}
-            className="self-start text-left font-sans text-muted transition-colors hover:text-cream sm:self-auto focus-visible:focus-ring"
+            className="self-start text-left font-sans text-muted transition-colors hover:text-cream sm:self-auto outline-none focus-visible:underline"
           >
             Methodology &amp; settings
           </button>

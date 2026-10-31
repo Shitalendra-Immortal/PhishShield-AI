@@ -1,7 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
+  CheckCircle2,
   Copy,
   ExternalLink,
   Info,
@@ -69,6 +71,77 @@ function renderEvidence(input: string, highlights?: Highlight[]): ReactNode[] {
   return nodes;
 }
 
+function getAssessmentComparison(scan: ScanResult, ai: NonNullable<ScanResult["ai"]>) {
+  const normBackend =
+    scan.level === "high" ? "phishing" : scan.level === "low" ? "safe" : scan.level;
+  const normAi = ai.assessment?.toLowerCase();
+
+  if (!normAi) return null;
+
+  const agrees = normBackend === normAi;
+  if (agrees) {
+    return {
+      agrees: true,
+      normBackend,
+      normAi,
+      explanation: null,
+    };
+  }
+
+  // Extract actual signal names from AI
+  const aiSignalNames = (ai.signals || [])
+    .map((s) => AI_SIGNAL_TITLES[s.type] || s.type.replace(/_/g, " "))
+    .filter(Boolean);
+  const aiSignalList =
+    aiSignalNames.length > 0
+      ? aiSignalNames.slice(0, 2).map((s) => s.toLowerCase()).join(" and ")
+      : null;
+
+  // Extract actual backend reasons
+  const engineReasons = (scan.reasons || [])
+    .filter((r) => r.points > 0)
+    .map((r) => r.label.toLowerCase())
+    .slice(0, 2);
+  const engineReasonList = engineReasons.length > 0 ? engineReasons.join(" and ") : null;
+
+  let explanation = "";
+
+  if (normBackend === "safe" && normAi === "suspicious") {
+    explanation = aiSignalList
+      ? `The primary engine classified this message as Safe based on structural rules, but the AI identified contextual warning signs, such as ${aiSignalList}, leading it to suggest caution.`
+      : `The primary detection engine classified the message as Safe, but the AI identified contextual warning signs not sufficiently captured by the primary engine.`;
+  } else if (normBackend === "suspicious" && normAi === "phishing") {
+    explanation = aiSignalList
+      ? `The primary detection engine identified suspicious indicators (${scan.score}/100) and classified the message as Suspicious. The AI identified additional contextual warning signs, such as ${aiSignalList}, leading it to assess the message as Phishing.`
+      : `The primary detection engine scored the message as Suspicious (${scan.score}/100). The AI identified stronger phishing indicators, leading it to assess the message as Phishing.`;
+  } else if (normBackend === "phishing" && normAi === "safe") {
+    explanation = engineReasonList
+      ? `The primary engine detected strong phishing indicators (${engineReasonList}), but the AI did not identify sufficient contextual evidence in the text. Always follow the primary engine verdict for security.`
+      : `The primary engine detected strong phishing indicators, but the AI did not identify sufficient contextual evidence. Always follow the primary engine verdict for security.`;
+  } else if (normBackend === "suspicious" && normAi === "safe") {
+    explanation = engineReasonList
+      ? `The primary engine flagged suspicious indicators (${engineReasonList}), but the AI assessed the text context as benign. The primary engine's suspicious verdict remains authoritative.`
+      : `The primary engine detected suspicious indicators (${scan.score}/100), but the AI assessed the phrasing as benign. The primary engine verdict remains authoritative.`;
+  } else if (normBackend === "safe" && normAi === "phishing") {
+    explanation = aiSignalList
+      ? `The primary engine detected no rule-based threats, but the AI identified critical contextual phishing signs (${aiSignalList}). Exercise heightened caution.`
+      : `The primary engine detected no rule-based threats, but the AI identified strong phishing indicators. Exercise caution.`;
+  } else if (normBackend === "phishing" && normAi === "suspicious") {
+    explanation = engineReasonList
+      ? `The primary engine detected strong phishing indicators (${engineReasonList}), whereas the AI assessed the severity as Suspicious. The primary engine's phishing verdict is final.`
+      : `The primary engine detected high-confidence phishing indicators. The AI assessed the threat as Suspicious, but the primary engine verdict remains final.`;
+  } else {
+    explanation = `The assessments differ because the primary engine analyzes technical signatures and structural rules, while the AI evaluates language semantics and social-engineering patterns. The primary engine verdict remains final.`;
+  }
+
+  return {
+    agrees: false,
+    normBackend,
+    normAi,
+    explanation,
+  };
+}
+
 function reportText(scan: ScanResult): string {
   const lines = [
     `==============================================`,
@@ -130,6 +203,12 @@ function reportText(scan: ScanResult): string {
     if (ai.recommendedAction) {
       lines.push(`AI Action: ${ai.recommendedAction}`);
     }
+
+    const comp = getAssessmentComparison(scan, ai);
+    if (comp && !comp.agrees && comp.explanation) {
+      lines.push("", "--- WHY ASSESSMENTS DIFFER ---");
+      lines.push(comp.explanation);
+    }
   }
 
   lines.push("", "--- RECOMMENDED ACTION ---");
@@ -162,6 +241,10 @@ export function Result({
   const evidence = useMemo(() => renderEvidence(scan.input, scan.highlights), [scan]);
   const style = RISK_STYLES[scan.level] || RISK_STYLES.safe;
   const ai = scan.ai || scan.aiOpinion;
+  const aiComparison = useMemo(
+    () => (ai && ai.available ? getAssessmentComparison(scan, ai) : null),
+    [scan, ai],
+  );
 
   const copy = async () => {
     try {
@@ -322,6 +405,44 @@ export function Result({
         </div>
       </section>
 
+      {/* Redirect Chain & Final Destination: 16px radius card */}
+      {scan.redirectChain && scan.redirectChain.length > 0 && (
+        <section className="overflow-hidden rounded-[16px] border border-line bg-surface">
+          <header className="flex items-center gap-2.5 px-6 py-4 border-b border-line-soft sm:px-8">
+            <Route className="h-4 w-4 text-flame" />
+            <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
+              Redirect Analysis &amp; Destination
+            </h2>
+          </header>
+          <div className="p-6 sm:p-8 space-y-3.5">
+            <p className="font-sans text-[0.92rem] text-cream/90 leading-relaxed">
+              Link shorteners conceal where links go. PhishShield traced the full redirection chain:
+            </p>
+            <ol className="space-y-2.5 font-mono text-[0.86rem]">
+              {scan.redirectChain.map((url, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3 rounded-[10px] border border-line-soft bg-elevated p-3 text-cream/95 break-all"
+                >
+                  <span className="rounded-[6px] bg-interactive border border-line px-2 py-0.5 text-[0.74rem] font-medium text-muted shrink-0">
+                    {i === 0 ? "Short URL" : `Hop ${i}`}
+                  </span>
+                  <span>{url}</span>
+                </li>
+              ))}
+              {scan.finalUrl && (
+                <li className="flex items-start gap-3 rounded-[10px] border border-flame/30 bg-flame/10 p-3.5 text-cream break-all font-semibold">
+                  <span className="rounded-[6px] bg-flame-gradient px-2 py-0.5 text-[0.74rem] text-[#1B1011] shrink-0 font-sans font-bold">
+                    Destination
+                  </span>
+                  <span className="flex-1 font-mono">{scan.finalUrl}</span>
+                </li>
+              )}
+            </ol>
+          </div>
+        </section>
+      )}
+
       {/* AI Second Opinion: Shown only when ai exists and ai.available is true */}
       {ai && ai.available && (
         <section className="relative overflow-hidden rounded-[16px] border border-line bg-surface animate-rise">
@@ -408,42 +529,65 @@ export function Result({
         </section>
       )}
 
-      {/* Redirect Chain & Final Destination: 16px radius card */}
-      {scan.redirectChain && scan.redirectChain.length > 0 && (
-        <section className="overflow-hidden rounded-[16px] border border-line bg-surface">
-          <header className="flex items-center gap-2.5 px-6 py-4 border-b border-line-soft sm:px-8">
-            <Route className="h-4 w-4 text-flame" />
-            <h2 className="font-display text-[1.12rem] font-semibold tracking-[-0.02em] text-cream">
-              Redirect Analysis &amp; Destination
-            </h2>
-          </header>
-          <div className="p-6 sm:p-8 space-y-3.5">
-            <p className="font-sans text-[0.92rem] text-cream/90 leading-relaxed">
-              Link shorteners conceal where links go. PhishShield traced the full redirection chain:
+      {/* Why Do the Assessments Differ? / Agreement Indicator */}
+      {ai && ai.available && aiComparison && (
+        aiComparison.agrees ? (
+          <div className="flex items-center gap-2.5 rounded-[12px] border border-safe/30 bg-safe/10 px-4.5 py-3 text-cream animate-fade">
+            <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-safe" />
+            <p className="font-sans text-[0.86rem] leading-relaxed">
+              <strong className="text-safe font-semibold">Both assessments agree: </strong>
+              <span className="text-cream/90">
+                The primary engine and the AI second opinion both classified this content as{" "}
+                <span className="font-semibold capitalize text-cream">{aiComparison.normBackend}</span>.
+              </span>
             </p>
-            <ol className="space-y-2.5 font-mono text-[0.86rem]">
-              {scan.redirectChain.map((url, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 rounded-[10px] border border-line-soft bg-elevated p-3 text-cream/95 break-all"
-                >
-                  <span className="rounded-[6px] bg-interactive border border-line px-2 py-0.5 text-[0.74rem] font-medium text-muted shrink-0">
-                    {i === 0 ? "Short URL" : `Hop ${i}`}
-                  </span>
-                  <span>{url}</span>
-                </li>
-              ))}
-              {scan.finalUrl && (
-                <li className="flex items-start gap-3 rounded-[10px] border border-flame/30 bg-flame/10 p-3.5 text-cream break-all font-semibold">
-                  <span className="rounded-[6px] bg-flame-gradient px-2 py-0.5 text-[0.74rem] text-[#1B1011] shrink-0 font-sans font-bold">
-                    Destination
-                  </span>
-                  <span className="flex-1 font-mono">{scan.finalUrl}</span>
-                </li>
-              )}
-            </ol>
           </div>
-        </section>
+        ) : (
+          <section className="relative overflow-hidden rounded-[16px] border border-warn/35 bg-warn/10 p-5 sm:p-6 animate-rise">
+            <div className="flex items-start gap-3.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-warn/20 text-warn">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-display text-[1.05rem] font-semibold text-cream flex items-center gap-2">
+                    Why do the assessments differ?
+                  </h3>
+                  <span className="font-mono text-[0.74rem] font-semibold uppercase tracking-wider text-warn/90 rounded-[6px] border border-warn/30 bg-warn/15 px-2 py-0.5">
+                    Notice
+                  </span>
+                </div>
+
+                {/* Compact Comparison Summary */}
+                <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[0.8rem] text-muted border-y border-warn/20 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted/80">Backend verdict:</span>
+                    <span className="font-semibold text-cream capitalize">
+                      {scan.level} ({scan.score}/100)
+                    </span>
+                  </div>
+                  <span className="text-warn/60">·</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted/80">AI second opinion:</span>
+                    <span className="font-semibold text-cream capitalize">
+                      {ai.assessment}
+                      {ai.confidence ? ` (${ai.confidence} confidence)` : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Grounded Explanation */}
+                <p className="mt-3 font-sans text-[0.92rem] leading-relaxed text-cream/95">
+                  {aiComparison.explanation}
+                </p>
+
+                <p className="mt-2 text-[0.76rem] font-sans font-medium text-muted">
+                  The engine verdict above is final and remains authoritative.
+                </p>
+              </div>
+            </div>
+          </section>
+        )
       )}
 
       {/* What We Detected (Signals & Indicators): 16px radius card */}
