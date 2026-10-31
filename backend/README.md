@@ -81,6 +81,7 @@ borderline-only gating).
 | `URLHAUS_AUTH_KEY` | (none) | Free Auth-Key from abuse.ch (auth.abuse.ch). Required for URLhaus lookups; without it lookups report `unknown`. Never commit a real key — set it in Render's dashboard env vars. |
 | `AI_SERVICE_URL` | (none) | Base URL of Member 3's AI service (e.g. its Render URL). Unset = AI second opinion disabled, no `ai` field. |
 | `AI_TIMEOUT_MS` | `8000` | Timeout for the AI service call; on timeout the `ai` field is omitted. |
+| `AI_SERVICE_KEY` | (none) | Shared secret sent as `X-AI-Service-Key` to the AI service. Set the same value on the AI service and the backend; unset = no header sent. |
 
 ## Deploy to Render (free tier)
 

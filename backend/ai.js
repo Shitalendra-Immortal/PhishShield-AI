@@ -33,9 +33,11 @@ async function getAiOpinion(input, engine, options) {
   var controller = new AbortController();
   var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
   try {
+    var headers = { 'Content-Type': 'application/json' };
+    if (process.env.AI_SERVICE_KEY) headers['X-AI-Service-Key'] = process.env.AI_SERVICE_KEY;
     var res = await fetch(baseUrl + '/ai/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({
         input: input,
         engine: {

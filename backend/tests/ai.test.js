@@ -93,6 +93,25 @@ async function post(path, body, port) {
   op = await getAiOpinion('x', ENGINE, {});
   check('disabled (no URL) -> null', op === null);
 
+  // Service-key header: sent only when AI_SERVICE_KEY is configured.
+  let seenHeaders = null;
+  m = await startMock((req, res) => {
+    seenHeaders = req.headers;
+    jsonRes(res, GOOD);
+  });
+  process.env.AI_SERVICE_KEY = 'test-key';
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('service key header sent when configured', op !== null && seenHeaders['x-ai-service-key'] === 'test-key');
+  await close(m.srv);
+  delete process.env.AI_SERVICE_KEY;
+  m = await startMock((req, res) => {
+    seenHeaders = req.headers;
+    jsonRes(res, GOOD);
+  });
+  op = await getAiOpinion('x', ENGINE, { baseUrl: m.url });
+  check('no service key header when unconfigured', op !== null && !seenHeaders['x-ai-service-key']);
+  await close(m.srv);
+
   // --- server-level: wiring ---
   let mode = 'good';
   m = await startMock((req, res) => {
