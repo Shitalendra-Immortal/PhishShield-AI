@@ -61,6 +61,7 @@ export default function App() {
         threatIntel: apiRes.threatIntel,
         ai: apiRes.ai,
         aiOpinion: apiRes.ai,
+        assessment: apiRes.assessment ?? null,
       };
 
       add(scan);

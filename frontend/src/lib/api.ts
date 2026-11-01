@@ -1,4 +1,4 @@
-import type { AiSecondOpinion } from "../types";
+import type { AiSecondOpinion, Assessment } from "../types";
 
 export interface AnalyzeVerdict {
   level: "safe" | "suspicious" | "phishing";
@@ -29,6 +29,7 @@ export interface AnalyzeResponse {
   finalUrl?: string | null;
   threatIntel?: ThreatIntel;
   ai?: AiSecondOpinion;
+  assessment?: Assessment;
 }
 
 export interface SampleItem {

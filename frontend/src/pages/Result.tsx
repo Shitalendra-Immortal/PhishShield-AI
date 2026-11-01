@@ -71,6 +71,43 @@ function renderEvidence(input: string, highlights?: Highlight[]): ReactNode[] {
   return nodes;
 }
 
+type FinalLevel = "safe" | "suspicious" | "phishing";
+
+const FINAL_SEVERITY: Record<FinalLevel, number> = { safe: 0, suspicious: 1, phishing: 2 };
+const FINAL_BAND_FLOOR: Record<FinalLevel, number> = { safe: 0, suspicious: 30, phishing: 60 };
+
+// Display values for the verdict card: the headline and risk score follow
+// the aggregator's final verdict. Most of the time the backend verdict IS
+// the final, so nothing changes. When the AI justifiably escalates, the
+// score shown is the final band's floor (60 for phishing, 30 for
+// suspicious) — the AI produces no numeric score of its own — and the
+// engine's measured score stays visible alongside, so a derived number is
+// never presented as measured.
+function getDisplayVerdict(scan: ScanResult): {
+  level: FinalLevel;
+  label: string;
+  score: number;
+  escalated: boolean;
+} {
+  const backend: FinalLevel =
+    scan.level === "high" ? "phishing" : scan.level === "low" ? "safe" : scan.level;
+  const final = scan.assessment?.finalVerdict;
+  if (!final || FINAL_SEVERITY[final] <= FINAL_SEVERITY[backend]) {
+    return {
+      level: backend,
+      label: RISK_STYLES[backend]?.label || scan.verdict,
+      score: scan.score,
+      escalated: false,
+    };
+  }
+  return {
+    level: final,
+    label: RISK_STYLES[final]?.label || final,
+    score: FINAL_BAND_FLOOR[final],
+    escalated: true,
+  };
+}
+
 function getAssessmentComparison(scan: ScanResult, ai: NonNullable<ScanResult["ai"]>) {
   const normBackend =
     scan.level === "high" ? "phishing" : scan.level === "low" ? "safe" : scan.level;
@@ -143,15 +180,20 @@ function getAssessmentComparison(scan: ScanResult, ai: NonNullable<ScanResult["a
 }
 
 function reportText(scan: ScanResult): string {
+  const display = getDisplayVerdict(scan);
   const lines = [
     `==============================================`,
     `PHISHSHIELD SECURITY ASSESSMENT REPORT`,
     `==============================================`,
-    `Verdict: ${scan.verdict}`,
-    `Risk Score: ${scan.score}/100 (${RISK_STYLES[scan.level]?.label || scan.level})`,
+    `Verdict: ${display.label}`,
+    `Risk Score: ${display.score}/100 (${display.label})`,
     `Type: ${TYPE_LABEL[scan.type]} · Date: ${formatDate(scan.createdAt)} ${formatTime(scan.createdAt)}`,
     "",
   ];
+
+  if (display.escalated) {
+    lines.push(`Engine Score: ${scan.score}/100 (AI escalated the final verdict)`);
+  }
 
   if (scan.host) {
     lines.push(`Analyzed Host: ${scan.host}`);
@@ -239,7 +281,8 @@ export function Result({
   const [copied, setCopied] = useState(false);
   const [copiedInput, setCopiedInput] = useState(false);
   const evidence = useMemo(() => renderEvidence(scan.input, scan.highlights), [scan]);
-  const style = RISK_STYLES[scan.level] || RISK_STYLES.safe;
+  const display = getDisplayVerdict(scan);
+  const style = RISK_STYLES[display.level] || RISK_STYLES.safe;
   const ai = scan.ai || scan.aiOpinion;
   const aiComparison = useMemo(
     () => (ai && ai.available ? getAssessmentComparison(scan, ai) : null),
@@ -312,7 +355,7 @@ export function Result({
             </div>
 
             <h1 className="font-display text-[2.2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-cream sm:text-[2.8rem]">
-              {scan.verdict}
+              {display.label}
             </h1>
 
             {scan.summary && (
@@ -354,7 +397,7 @@ export function Result({
             )}
 
             <div className="mt-6 flex flex-wrap items-center gap-3 font-sans text-[0.84rem] text-muted">
-              <RiskPill level={scan.level} />
+              <RiskPill level={display.level} />
               <span className="font-mono text-[0.8rem]">
                 {formatDate(scan.createdAt)} · {formatTime(scan.createdAt)}
               </span>
@@ -371,32 +414,38 @@ export function Result({
 
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-[4.4rem] font-semibold leading-none tracking-tight text-gradient tabular-nums sm:text-[5rem]">
-                {scan.score}
+                {display.score}
               </span>
               <span className="font-mono text-[1.4rem] leading-none text-muted font-medium">
                 / 100
               </span>
             </div>
 
+            {display.escalated && (
+              <p className="mt-2 font-mono text-[0.76rem] text-muted">
+                Engine: {scan.score}/100 · AI escalated the final verdict
+              </p>
+            )}
+
             {/* Progress Bar (6px radius) */}
             <div className="relative mt-4 h-2.5 w-full overflow-hidden rounded-[6px] border border-line bg-interactive p-0.5">
               <div
                 className={cn("h-full rounded-[6px] bg-gradient-to-r transition-all duration-500", style.bar)}
-                style={{ width: `${Math.max(5, scan.score)}%` }}
+                style={{ width: `${Math.max(5, display.score)}%` }}
               />
             </div>
 
             {/* Scale with Spectrum Values Below Text */}
             <div className="mt-3 grid grid-cols-3 text-center font-mono text-[0.76rem]">
-              <div className={cn("flex flex-col items-center leading-tight", scan.score < 30 ? "text-safe font-bold" : "text-safe/80 font-medium")}>
+              <div className={cn("flex flex-col items-center leading-tight", display.score < 30 ? "text-safe font-bold" : "text-safe/80 font-medium")}>
                 <span>Safe</span>
                 <span className="text-[0.7rem] opacity-90 font-mono">(0–29)</span>
               </div>
-              <div className={cn("flex flex-col items-center leading-tight", scan.score >= 30 && scan.score < 60 ? "text-warn font-bold" : "text-warn/80 font-medium")}>
+              <div className={cn("flex flex-col items-center leading-tight", display.score >= 30 && display.score < 60 ? "text-warn font-bold" : "text-warn/80 font-medium")}>
                 <span>Suspicious</span>
                 <span className="text-[0.7rem] opacity-90 font-mono">(30–59)</span>
               </div>
-              <div className={cn("flex flex-col items-center leading-tight", scan.score >= 60 ? "text-danger font-bold" : "text-danger/80 font-medium")}>
+              <div className={cn("flex flex-col items-center leading-tight", display.score >= 60 ? "text-danger font-bold" : "text-danger/80 font-medium")}>
                 <span>Phishing</span>
                 <span className="text-[0.7rem] opacity-90 font-mono">(60–100)</span>
               </div>
@@ -456,7 +505,11 @@ export function Result({
                   AI second opinion
                 </h2>
                 <p className="font-sans text-[0.78rem] text-muted">
-                  The engine verdict above is final.
+                  {scan.assessment
+                    ? display.escalated
+                      ? "The AI escalated the final verdict above."
+                      : "The final verdict above is final."
+                    : "The engine verdict above is final."}
                 </p>
               </div>
             </div>
@@ -560,7 +613,11 @@ export function Result({
                 </p>
 
                 <p className="mt-2 text-[0.76rem] font-sans font-medium text-muted">
-                  The engine verdict above is final and remains authoritative.
+                  {scan.assessment
+                    ? display.escalated
+                      ? "The final verdict above reflects the AI escalation."
+                      : "The final verdict above is final."
+                    : "The engine verdict above is final and remains authoritative."}
                 </p>
               </div>
             </div>

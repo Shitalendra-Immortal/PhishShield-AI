@@ -77,6 +77,28 @@ export interface AiSecondOpinion {
   error?: string | null;
 }
 
+export interface AssessmentEvidence {
+  source: "engine" | "ai";
+  label: string;
+  detail: string;
+  points?: number;
+}
+
+/**
+ * The dual-verdict aggregator's output, attached to every /api/analyze
+ * response. finalVerdict is the headline: the highest justified severity,
+ * never a combined score.
+ */
+export interface Assessment {
+  finalVerdict: "safe" | "suspicious" | "phishing";
+  backendVerdict: "safe" | "suspicious" | "phishing";
+  aiVerdict: "safe" | "suspicious" | "phishing" | null;
+  disagreement: boolean;
+  aiJustified: boolean;
+  combinedEvidence: AssessmentEvidence[];
+  recommendation: string;
+}
+
 export interface ScanResult {
   id: string;
   type: ScanType;
@@ -101,6 +123,7 @@ export interface ScanResult {
   confidence?: number;
   ai?: AiSecondOpinion | null;
   aiOpinion?: AiSecondOpinion | null;
+  assessment?: Assessment | null;
 }
 
 export type Sensitivity = "balanced" | "strict";
